@@ -799,3 +799,4 @@ export default function FishingCompetition() {
     </div>
   </div>
 </div>
+); }
