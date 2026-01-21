@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Trash2, Plus, Trophy, Fish, RefreshCw } from 'lucide-react';
+import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut } from 'lucide-react';
 
 // ⚠️ FONTOS: Cseréld ki ezeket a saját Supabase adataidra!
 const supabaseUrl = 'https://sskzueeefjcuqtuesojm.supabase.co';
@@ -8,24 +8,88 @@ const supabaseKey = 'sb_publishable_8iZhmXZCwGJpkJaoEm7cZg_3WFhQwUa';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function FishingCompetition() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  
   const [title, setTitle] = useState('Horgászverseny');
   const [competitors, setCompetitors] = useState([]);
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [weightInput, setWeightInput] = useState('');
-  const [loading, setLoading] = useState(true);
   const [competitionId, setCompetitionId] = useState(null);
 
-  // Adatok betöltése
+  // Auth ellenőrzés
   useEffect(() => {
-    loadData();
+    checkUser();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadData();
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
+  const checkUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Auth ellenőrzés hiba:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Bejelentkezés
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      
+      setUser(data.user);
+    } catch (error) {
+      console.error('Bejelentkezési hiba:', error);
+      setLoginError('Hibás email vagy jelszó!');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Kijelentkezés
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setCompetitors([]);
+    } catch (error) {
+      console.error('Kijelentkezési hiba:', error);
+    }
+  };
+
+  // Adatok betöltése
   const loadData = async () => {
     try {
       setLoading(true);
       
-      // Verseny betöltése
       const { data: competitions, error: compError } = await supabase
         .from('competitions')
         .select('*')
@@ -39,7 +103,6 @@ export default function FishingCompetition() {
         setCompetitionId(comp.id);
         setTitle(comp.title);
         
-        // Versenyzők betöltése
         const { data: competitorsData, error: comptsError } = await supabase
           .from('competitors')
           .select('*')
@@ -48,7 +111,6 @@ export default function FishingCompetition() {
         
         if (comptsError) throw comptsError;
         
-        // Fogások betöltése minden versenyzőhöz
         const competitorsWithCatches = await Promise.all(
           competitorsData.map(async (competitor) => {
             const { data: catches, error: catchError } = await supabase
@@ -70,13 +132,11 @@ export default function FishingCompetition() {
       }
     } catch (error) {
       console.error('Hiba az adatok betöltésekor:', error);
-      alert('Hiba történt az adatok betöltésekor: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Cím mentése
   const saveTitle = async (newTitle) => {
     if (!competitionId) return;
     
@@ -92,7 +152,6 @@ export default function FishingCompetition() {
     }
   };
 
-  // Versenyző hozzáadása
   const addCompetitor = async () => {
     if (newName.trim() && competitors.length < 45 && competitionId) {
       try {
@@ -114,7 +173,6 @@ export default function FishingCompetition() {
     }
   };
 
-  // Versenyző törlése
   const deleteCompetitor = async (id) => {
     try {
       const { error } = await supabase
@@ -131,7 +189,6 @@ export default function FishingCompetition() {
     }
   };
 
-  // Súly hozzáadása
   const addWeight = async (competitorId) => {
     const weight = parseInt(weightInput);
     if (isNaN(weight) || weight <= 0) {
@@ -143,11 +200,9 @@ export default function FishingCompetition() {
       const competitor = competitors.find(c => c.id === competitorId);
       let newCatches = [...competitor.catches, weight];
       
-      // Ha több mint 5 hal
       if (newCatches.length > 5) {
         const minWeight = Math.min(...newCatches);
         
-        // Töröljük a legkisebb halat az adatbázisból
         const { data: catchesToDelete, error: fetchError } = await supabase
           .from('catches')
           .select('*')
@@ -169,7 +224,6 @@ export default function FishingCompetition() {
         newCatches = newCatches.filter(w => w !== minWeight);
       }
       
-      // Új hal hozzáadása
       const { error } = await supabase
         .from('catches')
         .insert([
@@ -178,7 +232,6 @@ export default function FishingCompetition() {
       
       if (error) throw error;
       
-      // Rendezés
       newCatches.sort((a, b) => b - a);
       
       setCompetitors(competitors.map(c => 
@@ -193,13 +246,11 @@ export default function FishingCompetition() {
     }
   };
 
-  // Egy hal törlése
   const removeCatch = async (competitorId, catchIndex) => {
     try {
       const competitor = competitors.find(c => c.id === competitorId);
       const weightToRemove = competitor.catches[catchIndex];
       
-      // Keresés az adatbázisban
       const { data: catchesToDelete, error: fetchError } = await supabase
         .from('catches')
         .select('*')
@@ -231,7 +282,6 @@ export default function FishingCompetition() {
     }
   };
 
-  // Eredmények számítása (ugyanaz mint korábban)
   const results = useMemo(() => {
     const withScores = competitors.map(c => ({
       ...c,
@@ -257,6 +307,66 @@ export default function FishingCompetition() {
     return { with5Fish, with4Fish, with3Fish, biggestFishList };
   }, [competitors]);
 
+  // Bejelentkezési oldal
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <Fish className="w-16 h-16 mx-auto text-green-600 mb-4" />
+            <h1 className="text-3xl font-bold text-gray-800">Horgászverseny</h1>
+            <p className="text-gray-600 mt-2">Admin bejelentkezés</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Email cím
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                placeholder="admin@example.com"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Jelszó
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {loginError && (
+              <div className="bg-red-100 border-2 border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                {loginError}
+              </div>
+            )}
+            
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Főoldal (bejelentkezve)
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
@@ -268,7 +378,6 @@ export default function FishingCompetition() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Fejléc */}
         <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-lg shadow-xl mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
@@ -284,18 +393,27 @@ export default function FishingCompetition() {
                 placeholder="Verseny címe..."
               />
             </div>
-            <button
-              onClick={loadData}
-              className="ml-4 p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
-              title="Frissítés"
-            >
-              <RefreshCw className="w-6 h-6" />
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={loadData}
+                className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
+                title="Frissítés"
+              >
+                <RefreshCw className="w-6 h-6" />
+              </button>
+              <button
+                onClick={handleLogout}
+                className="p-2 bg-red-500 bg-opacity-80 rounded-lg hover:bg-opacity-100 flex items-center gap-2 px-4"
+                title="Kijelentkezés"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="font-semibold">Kilépés</span>
+              </button>
+            </div>
           </div>
-          <p className="mt-2 text-green-100">45 versenyző • 5 hal • Összsúly alapján</p>
+          <p className="mt-2 text-green-100">45 versenyző • 5 hal • Összsúly alapján • Bejelentkezve: {user.email}</p>
         </div>
 
-        {/* Versenyző hozzáadása */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Versenyző Hozzáadása</h2>
           <div className="flex gap-3">
@@ -319,7 +437,6 @@ export default function FishingCompetition() {
           </div>
         </div>
 
-        {/* Versenyzők táblázata */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Versenyzők és Fogások</h2>
           <div className="overflow-x-auto">
@@ -435,9 +552,7 @@ export default function FishingCompetition() {
           </div>
         </div>
 
-        {/* Eredmények - ugyanaz mint korábban */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
-          {/* 5 halat fogottak */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-yellow-500" />
@@ -467,7 +582,6 @@ export default function FishingCompetition() {
             )}
           </div>
 
-          {/* 4 halat fogottak */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-gray-400" />
@@ -492,7 +606,6 @@ export default function FishingCompetition() {
             )}
           </div>
 
-          {/* 3 halat fogottak */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-4 text-purple-700 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-bronze-400" />
@@ -517,7 +630,6 @@ export default function FishingCompetition() {
             )}
           </div>
 
-          {/* Legnagyobb hal */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-4 text-red-700 flex items-center gap-2">
               <Fish className="w-6 h-6 text-red-500" />
