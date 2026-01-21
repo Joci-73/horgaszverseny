@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut } from 'lucide-react';
+import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, Save, FolderOpen, PlusCircle } from 'lucide-react';
 
 // ⚠️ FONTOS: Cseréld ki ezeket a saját Supabase adataidra!
 const supabaseUrl = 'https://sskzueeefjcuqtuesojm.supabase.co';
@@ -14,6 +14,8 @@ export default function FishingCompetition() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   
+  const [showCompetitionList, setShowCompetitionList] = useState(false);
+  const [competitions, setCompetitions] = useState([]);
   const [title, setTitle] = useState('Horgászverseny');
   const [competitors, setCompetitors] = useState([]);
   const [newName, setNewName] = useState('');
@@ -21,14 +23,13 @@ export default function FishingCompetition() {
   const [weightInput, setWeightInput] = useState('');
   const [competitionId, setCompetitionId] = useState(null);
 
-  // Auth ellenőrzés
   useEffect(() => {
     checkUser();
     
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadData();
+        loadCompetitions();
       }
     });
 
@@ -42,7 +43,7 @@ export default function FishingCompetition() {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       if (session?.user) {
-        await loadData();
+        await loadCompetitions();
       }
     } catch (error) {
       console.error('Auth ellenőrzés hiba:', error);
@@ -51,7 +52,6 @@ export default function FishingCompetition() {
     }
   };
 
-  // Bejelentkezés
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
@@ -74,66 +74,147 @@ export default function FishingCompetition() {
     }
   };
 
-  // Kijelentkezés
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
       setUser(null);
       setCompetitors([]);
+      setCompetitions([]);
+      setCompetitionId(null);
     } catch (error) {
       console.error('Kijelentkezési hiba:', error);
     }
   };
 
-  // Adatok betöltése
-  const loadData = async () => {
+  // Versenyek betöltése
+  const loadCompetitions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('competitions')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      setCompetitions(data || []);
+      
+      // Ha nincs még verseny, hozzunk létre egyet
+      if (!data || data.length === 0) {
+        await createNewCompetition();
+      } else {
+        // Az első versenyt töltsük be alapértelmezetten
+        await loadCompetition(data[0].id);
+      }
+    } catch (error) {
+      console.error('Hiba a versenyek betöltésekor:', error);
+    }
+  };
+
+  // Új verseny létrehozása
+  const createNewCompetition = async () => {
+    try {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+      
+      const { data, error } = await supabase
+        .from('competitions')
+        .insert([
+          { title: `Horgászverseny - ${dateStr}` }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      setCompetitionId(data[0].id);
+      setTitle(data[0].title);
+      setCompetitors([]);
+      await loadCompetitions();
+      setShowCompetitionList(false);
+    } catch (error) {
+      console.error('Hiba az új verseny létrehozásakor:', error);
+      alert('Hiba történt: ' + error.message);
+    }
+  };
+
+  // Verseny betöltése
+  const loadCompetition = async (compId) => {
     try {
       setLoading(true);
       
-      const { data: competitions, error: compError } = await supabase
+      const { data: comp, error: compError } = await supabase
         .from('competitions')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .eq('id', compId)
+        .single();
       
       if (compError) throw compError;
       
-      if (competitions && competitions.length > 0) {
-        const comp = competitions[0];
-        setCompetitionId(comp.id);
-        setTitle(comp.title);
-        
-        const { data: competitorsData, error: comptsError } = await supabase
-          .from('competitors')
-          .select('*')
-          .eq('competition_id', comp.id)
-          .order('created_at', { ascending: true });
-        
-        if (comptsError) throw comptsError;
-        
-        const competitorsWithCatches = await Promise.all(
-          competitorsData.map(async (competitor) => {
-            const { data: catches, error: catchError } = await supabase
-              .from('catches')
-              .select('*')
-              .eq('competitor_id', competitor.id)
-              .order('weight', { ascending: false });
-            
-            if (catchError) throw catchError;
-            
-            return {
-              ...competitor,
-              catches: catches.map(c => c.weight)
-            };
-          })
-        );
-        
-        setCompetitors(competitorsWithCatches);
-      }
+      setCompetitionId(comp.id);
+      setTitle(comp.title);
+      
+      const { data: competitorsData, error: comptsError } = await supabase
+        .from('competitors')
+        .select('*')
+        .eq('competition_id', comp.id)
+        .order('created_at', { ascending: true });
+      
+      if (comptsError) throw comptsError;
+      
+      const competitorsWithCatches = await Promise.all(
+        (competitorsData || []).map(async (competitor) => {
+          const { data: catches, error: catchError } = await supabase
+            .from('catches')
+            .select('*')
+            .eq('competitor_id', competitor.id)
+            .order('weight', { ascending: false });
+          
+          if (catchError) throw catchError;
+          
+          return {
+            ...competitor,
+            catches: catches.map(c => c.weight)
+          };
+        })
+      );
+      
+      setCompetitors(competitorsWithCatches);
+      setShowCompetitionList(false);
     } catch (error) {
-      console.error('Hiba az adatok betöltésekor:', error);
+      console.error('Hiba a verseny betöltésekor:', error);
+      alert('Hiba történt: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Verseny törlése
+  const deleteCompetition = async (compId) => {
+    if (!confirm('Biztosan törölni szeretnéd ezt a versenyt? Ez nem visszavonható!')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('competitions')
+        .delete()
+        .eq('id', compId);
+      
+      if (error) throw error;
+      
+      await loadCompetitions();
+      
+      // Ha az aktív versenyt töröltük, váltsunk másikra
+      if (compId === competitionId) {
+        const remaining = competitions.filter(c => c.id !== compId);
+        if (remaining.length > 0) {
+          await loadCompetition(remaining[0].id);
+        } else {
+          await createNewCompetition();
+        }
+      }
+    } catch (error) {
+      console.error('Hiba a verseny törlésekor:', error);
+      alert('Hiba történt: ' + error.message);
     }
   };
 
@@ -147,6 +228,11 @@ export default function FishingCompetition() {
         .eq('id', competitionId);
       
       if (error) throw error;
+      
+      // Frissítsük a versenyek listáját is
+      setCompetitions(competitions.map(c => 
+        c.id === competitionId ? { ...c, title: newTitle } : c
+      ));
     } catch (error) {
       console.error('Hiba a cím mentésekor:', error);
     }
@@ -366,7 +452,82 @@ export default function FishingCompetition() {
     );
   }
 
-  // Főoldal (bejelentkezve)
+  // Versenyek listája modal
+  if (showCompetitionList) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-2xl p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                <FolderOpen className="w-8 h-8 text-blue-600" />
+                Mentett Versenyek
+              </h2>
+              <button
+                onClick={() => setShowCompetitionList(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <button
+              onClick={createNewCompetition}
+              className="w-full mb-6 bg-green-600 text-white py-4 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2"
+            >
+              <PlusCircle className="w-6 h-6" />
+              Új Verseny Indítása
+            </button>
+
+            <div className="space-y-3">
+              {competitions.map((comp) => {
+                const date = new Date(comp.created_at);
+                const dateStr = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+                const isActive = comp.id === competitionId;
+                
+                return (
+                  <div
+                    key={comp.id}
+                    className={`border-2 rounded-lg p-4 flex justify-between items-center ${
+                      isActive ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-800">{comp.title}</h3>
+                      <p className="text-gray-600 text-sm">{dateStr}</p>
+                      {isActive && (
+                        <span className="inline-block mt-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                          Aktív
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {!isActive && (
+                        <button
+                          onClick={() => loadCompetition(comp.id)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                        >
+                          Betöltés
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteCompetition(comp.id)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
+                      >
+                        Törlés
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Főoldal
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
@@ -395,7 +556,15 @@ export default function FishingCompetition() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={loadData}
+                onClick={() => setShowCompetitionList(true)}
+                className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4"
+                title="Versenyek kezelése"
+              >
+                <FolderOpen className="w-5 h-5" />
+                <span className="font-semibold">Versenyek</span>
+              </button>
+              <button
+                onClick={() => loadCompetition(competitionId)}
                 className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
                 title="Frissítés"
               >
@@ -552,111 +721,81 @@ export default function FishingCompetition() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
+        {/* Eredmények - ugyanaz mint előtt */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
-              <Trophy className="w-6 h-6 text-yellow-500" />
-              5 halat fogottak (Top 6)
-            </h3>
-            {results.with5Fish.length > 0 ? (
-              <div className="space-y-2">
-                {results.with5Fish.map((c, i) => (
-                  <div key={c.id} className={`flex justify-between items-center p-3 rounded ${
-                    i === 0 ? 'bg-yellow-100 border-2 border-yellow-400' :
-                    i === 1 ? 'bg-gray-100 border-2 border-gray-400' :
-                    i === 2 ? 'bg-orange-100 border-2 border-orange-400' :
-                    'bg-gray-50'
-                  }`}>
-                    <span className="font-semibold">
-                      <span className="text-2xl mr-2">{i + 1}.</span>
-                      {c.name}
-                    </span>
-                    <span className="font-bold text-green-700 text-lg">
-                      {c.totalWeight} g
-                    </span>
-                  </div>
-                ))}
+        <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
+          <Trophy className="w-6 h-6 text-gray-400" />
+          4 halat fogottak (Top 6)
+        </h3>
+        {results.with4Fish.length > 0 ? (
+          <div className="space-y-2">
+            {results.with4Fish.map((c, i) => (
+              <div key={c.id} className="flex justify-between items-center p-3 rounded bg-gray-50">
+                <span className="font-semibold">
+                  <span className="text-2xl mr-2">{i + 1}.</span>
+                  {c.name}
+                </span>
+                <span className="font-bold text-blue-700 text-lg">
+                  {c.totalWeight} g
+                </span>
               </div>
-            ) : (
-              <p className="text-gray-400 text-center py-4">Még nincs 5 halat fogott versenyző</p>
-            )}
+            ))}
           </div>
+        ) : (
+          <p className="text-gray-400 text-center py-4">Még nincs 4 halat fogott versenyző</p>
+        )}
+      </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
-              <Trophy className="w-6 h-6 text-gray-400" />
-              4 halat fogottak (Top 6)
-            </h3>
-            {results.with4Fish.length > 0 ? (
-              <div className="space-y-2">
-                {results.with4Fish.map((c, i) => (
-                  <div key={c.id} className="flex justify-between items-center p-3 rounded bg-gray-50">
-                    <span className="font-semibold">
-                      <span className="text-2xl mr-2">{i + 1}.</span>
-                      {c.name}
-                    </span>
-                    <span className="font-bold text-blue-700 text-lg">
-                      {c.totalWeight} g
-                    </span>
-                  </div>
-                ))}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h3 className="text-xl font-bold mb-4 text-purple-700 flex items-center gap-2">
+          <Trophy className="w-6 h-6 text-bronze-400" />
+          3 halat fogottak (Top 6)
+        </h3>
+        {results.with3Fish.length > 0 ? (
+          <div className="space-y-2">
+            {results.with3Fish.map((c, i) => (
+              <div key={c.id} className="flex justify-between items-center p-3 rounded bg-gray-50">
+                <span className="font-semibold">
+                  <span className="text-2xl mr-2">{i + 1}.</span>
+                  {c.name}
+                </span>
+                <span className="font-bold text-purple-700 text-lg">
+                  {c.totalWeight} g
+                </span>
               </div>
-            ) : (
-              <p className="text-gray-400 text-center py-4">Még nincs 4 halat fogott versenyző</p>
-            )}
+            ))}
           </div>
+        ) : (
+          <p className="text-gray-400 text-center py-4">Még nincs 3 halat fogott versenyző</p>
+        )}
+      </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-xl font-bold mb-4 text-purple-700 flex items-center gap-2">
-              <Trophy className="w-6 h-6 text-bronze-400" />
-              3 halat fogottak (Top 6)
-            </h3>
-            {results.with3Fish.length > 0 ? (
-              <div className="space-y-2">
-                {results.with3Fish.map((c, i) => (
-                  <div key={c.id} className="flex justify-between items-center p-3 rounded bg-gray-50">
-                    <span className="font-semibold">
-                      <span className="text-2xl mr-2">{i + 1}.</span>
-                      {c.name}
-                    </span>
-                    <span className="font-bold text-purple-700 text-lg">
-                      {c.totalWeight} g
-                    </span>
-                  </div>
-                ))}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h3 className="text-xl font-bold mb-4 text-red-700 flex items-center gap-2">
+          <Fish className="w-6 h-6 text-red-500" />
+          Legnagyobb hal (Top 5)
+        </h3>
+        {results.biggestFishList.length > 0 ? (
+          <div className="space-y-2">
+            {results.biggestFishList.map((c, i) => (
+              <div key={c.id} className={`flex justify-between items-center p-3 rounded ${
+                i === 0 ? 'bg-red-100 border-2 border-red-400' : 'bg-gray-50'
+              }`}>
+                <span className="font-semibold">
+                  <span className="text-2xl mr-2">{i + 1}.</span>
+                  {c.name}
+                </span>
+                <span className="font-bold text-red-700 text-lg">
+                  {c.biggestFish} g
+                </span>
               </div>
-            ) : (
-              <p className="text-gray-400 text-center py-4">Még nincs 3 halat fogott versenyző</p>
-            )}
+            ))}
           </div>
-
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-xl font-bold mb-4 text-red-700 flex items-center gap-2">
-              <Fish className="w-6 h-6 text-red-500" />
-              Legnagyobb hal (Top 5)
-            </h3>
-            {results.biggestFishList.length > 0 ? (
-              <div className="space-y-2">
-                {results.biggestFishList.map((c, i) => (
-                  <div key={c.id} className={`flex justify-between items-center p-3 rounded ${
-                    i === 0 ? 'bg-red-100 border-2 border-red-400' : 'bg-gray-50'
-                  }`}>
-                    <span className="font-semibold">
-                      <span className="text-2xl mr-2">{i + 1}.</span>
-                      {c.name}
-                    </span>
-                    <span className="font-bold text-red-700 text-lg">
-                      {c.biggestFish} g
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-400 text-center py-4">Még nincs fogott hal</p>
-            )}
-          </div>
-        </div>
+        ) : (
+          <p className="text-gray-400 text-center py-4">Még nincs fogott hal</p>
+        )}
       </div>
     </div>
-  );
-}
+  </div>
+</div>
