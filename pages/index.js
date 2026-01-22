@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, Save, FolderOpen, PlusCircle } from 'lucide-react';
+import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, FolderOpen, PlusCircle, Lock } from 'lucide-react';
 
 // ⚠️ FONTOS: Cseréld ki ezeket a saját Supabase adataidra!
 const supabaseUrl = 'https://sskzueeefjcuqtuesojm.supabase.co';
@@ -42,9 +42,8 @@ export default function FishingCompetition() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-      if (session?.user) {
-        await loadCompetitions();
-      }
+      // Mindig töltse be az adatokat (bejelentkezve vagy sem)
+      await loadCompetitions();
     } catch (error) {
       console.error('Auth ellenőrzés hiba:', error);
     } finally {
@@ -78,15 +77,11 @@ export default function FishingCompetition() {
     try {
       await supabase.auth.signOut();
       setUser(null);
-      setCompetitors([]);
-      setCompetitions([]);
-      setCompetitionId(null);
     } catch (error) {
       console.error('Kijelentkezési hiba:', error);
     }
   };
 
-  // Versenyek betöltése
   const loadCompetitions = async () => {
     try {
       const { data, error } = await supabase
@@ -98,11 +93,7 @@ export default function FishingCompetition() {
       
       setCompetitions(data || []);
       
-      // Ha nincs még verseny, hozzunk létre egyet
-      if (!data || data.length === 0) {
-        await createNewCompetition();
-      } else {
-        // Az első versenyt töltsük be alapértelmezetten
+      if (data && data.length > 0) {
         await loadCompetition(data[0].id);
       }
     } catch (error) {
@@ -110,7 +101,6 @@ export default function FishingCompetition() {
     }
   };
 
-  // Új verseny létrehozása
   const createNewCompetition = async () => {
     try {
       const now = new Date();
@@ -136,7 +126,6 @@ export default function FishingCompetition() {
     }
   };
 
-  // Verseny betöltése
   const loadCompetition = async (compId) => {
     try {
       setLoading(true);
@@ -181,13 +170,11 @@ export default function FishingCompetition() {
       setShowCompetitionList(false);
     } catch (error) {
       console.error('Hiba a verseny betöltésekor:', error);
-      alert('Hiba történt: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Verseny törlése
   const deleteCompetition = async (compId) => {
     if (!confirm('Biztosan törölni szeretnéd ezt a versenyt? Ez nem visszavonható!')) {
       return;
@@ -203,7 +190,6 @@ export default function FishingCompetition() {
       
       await loadCompetitions();
       
-      // Ha az aktív versenyt töröltük, váltsunk másikra
       if (compId === competitionId) {
         const remaining = competitions.filter(c => c.id !== compId);
         if (remaining.length > 0) {
@@ -229,7 +215,6 @@ export default function FishingCompetition() {
       
       if (error) throw error;
       
-      // Frissítsük a versenyek listáját is
       setCompetitions(competitions.map(c => 
         c.id === competitionId ? { ...c, title: newTitle } : c
       ));
@@ -393,67 +378,8 @@ export default function FishingCompetition() {
     return { with5Fish, with4Fish, with3Fish, biggestFishList };
   }, [competitors]);
 
-  // Bejelentkezési oldal
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <Fish className="w-16 h-16 mx-auto text-green-600 mb-4" />
-            <h1 className="text-3xl font-bold text-gray-800">Horgászverseny</h1>
-            <p className="text-gray-600 mt-2">Admin bejelentkezés</p>
-          </div>
-          
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email cím
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                placeholder="admin@example.com"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Jelszó
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            {loginError && (
-              <div className="bg-red-100 border-2 border-red-400 text-red-700 px-4 py-3 rounded-lg">
-                {loginError}
-              </div>
-            )}
-            
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // Versenyek listája modal
-  if (showCompetitionList) {
+  // Versenyek listája modal (ADMIN)
+  if (showCompetitionList && user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
         <div className="max-w-4xl mx-auto">
@@ -527,7 +453,7 @@ export default function FishingCompetition() {
     );
   }
 
-  // Főoldal
+  // Betöltés
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
@@ -536,33 +462,75 @@ export default function FishingCompetition() {
     );
   }
 
+  // FŐOLDAL - NYILVÁNOS ÉS ADMIN NÉZET
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
       <div className="max-w-7xl mx-auto">
+        {/* Fejléc */}
         <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-lg shadow-xl mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               <Fish className="w-10 h-10" />
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  saveTitle(e.target.value);
-                }}
-                className="text-4xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white placeholder-green-200 flex-1"
-                placeholder="Verseny címe..."
-              />
+              {user ? (
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    saveTitle(e.target.value);
+                  }}
+                  className="text-4xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white placeholder-green-200 flex-1"
+                  placeholder="Verseny címe..."
+                />
+              ) : (
+                <h1 className="text-4xl font-bold">{title}</h1>
+              )}
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowCompetitionList(true)}
-                className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4"
-                title="Versenyek kezelése"
-              >
-                <FolderOpen className="w-5 h-5" />
-                <span className="font-semibold">Versenyek</span>
-              </button>
+              {user ? (
+                <>
+                  <button
+                    onClick={() => setShowCompetitionList(true)}
+                    className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4"
+                    title="Versenyek kezelése"
+                  >
+                    <FolderOpen className="w-5 h-5" />
+                    <span className="font-semibold">Versenyek</span>
+                  </button>
+                  <button
+                    onClick={() => loadCompetition(competitionId)}
+                    className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
+                    title="Frissítés"
+                  >
+                    <RefreshCw className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 bg-red-500 bg-opacity-80 rounded-lg hover:bg-opacity-100 flex items-center gap-2 px-4"
+                    title="Kijelentkezés"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-semibold">Kilépés</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    const loginEmail = prompt('Email cím:');
+                    const loginPass = prompt('Jelszó:');
+                    if (loginEmail && loginPass) {
+                      setEmail(loginEmail);
+                      setPassword(loginPass);
+                      handleLogin({ preventDefault: () => {} });
+                    }
+                  }}
+                  className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4"
+                  title="Admin bejelentkezés"
+                >
+                  <Lock className="w-5 h-5" />
+                  <span className="font-semibold">Admin</span>
+                </button>
+              )}
               <button
                 onClick={() => loadCompetition(competitionId)}
                 className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
@@ -570,42 +538,41 @@ export default function FishingCompetition() {
               >
                 <RefreshCw className="w-6 h-6" />
               </button>
+            </div>
+          </div>
+          <p className="mt-2 text-green-100">
+            45 versenyző • 5 hal • Összsúly alapján
+            {user && ` • Admin: ${user.email}`}
+          </p>
+        </div>
+
+        {/* Versenyző hozzáadása - CSAK ADMIN */}
+        {user && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-2xl font-bold mb-4 text-gray-800">Versenyző Hozzáadása</h2>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addCompetitor()}
+                placeholder="Versenyző neve..."
+                className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                disabled={competitors.length >= 45}
+              />
               <button
-                onClick={handleLogout}
-                className="p-2 bg-red-500 bg-opacity-80 rounded-lg hover:bg-opacity-100 flex items-center gap-2 px-4"
-                title="Kijelentkezés"
+                onClick={addCompetitor}
+                disabled={competitors.length >= 45}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 font-semibold"
               >
-                <LogOut className="w-5 h-5" />
-                <span className="font-semibold">Kilépés</span>
+                <Plus className="w-5 h-5" />
+                Hozzáad ({competitors.length}/45)
               </button>
             </div>
           </div>
-          <p className="mt-2 text-green-100">45 versenyző • 5 hal • Összsúly alapján • Bejelentkezve: {user.email}</p>
-        </div>
+        )}
 
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-4 text-gray-800">Versenyző Hozzáadása</h2>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addCompetitor()}
-              placeholder="Versenyző neve..."
-              className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-              disabled={competitors.length >= 45}
-            />
-            <button
-              onClick={addCompetitor}
-              disabled={competitors.length >= 45}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 font-semibold"
-            >
-              <Plus className="w-5 h-5" />
-              Hozzáad ({competitors.length}/45)
-            </button>
-          </div>
-        </div>
-
+        {/* Versenyzők táblázata */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Versenyzők és Fogások</h2>
           <div className="overflow-x-auto">
@@ -620,8 +587,12 @@ export default function FishingCompetition() {
                   <th className="px-4 py-3 text-center font-semibold">4. hal (g)</th>
                   <th className="px-4 py-3 text-center font-semibold">5. hal (g)</th>
                   <th className="px-4 py-3 text-center font-semibold">Összsúly (g)</th>
-                  <th className="px-4 py-3 text-center font-semibold">Súly bevitel</th>
-                  <th className="px-4 py-3 text-center font-semibold">Művelet</th>
+                  {user && (
+                    <>
+                      <th className="px-4 py-3 text-center font-semibold">Súly bevitel</th>
+                      <th className="px-4 py-3 text-center font-semibold">Művelet</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -642,13 +613,15 @@ export default function FishingCompetition() {
                               <span className="font-semibold text-green-700">
                                 {competitor.catches[i]} g
                               </span>
-                              <button
-                                onClick={() => removeCatch(competitor.id, i)}
-                                className="text-red-500 hover:text-red-700 ml-1"
-                                title="Törlés"
-                              >
-                                ×
-                              </button>
+                              {user && (
+                                <button
+                                  onClick={() => removeCatch(competitor.id, i)}
+                                  className="text-red-500 hover:text-red-700 ml-1"
+                                  title="Törlés"
+                                >
+                                  ×
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <span className="text-gray-300">-</span>
@@ -660,53 +633,57 @@ export default function FishingCompetition() {
                           {totalWeight} g
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        {editingId === competitor.id ? (
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              step="1"
-                              value={weightInput}
-                              onChange={(e) => setWeightInput(e.target.value)}
-                              onKeyPress={(e) => e.key === 'Enter' && addWeight(competitor.id)}
-                              placeholder="gramm"
-                              className="w-24 px-2 py-1 border-2 border-blue-500 rounded focus:outline-none"
-                              autoFocus
-                            />
+                      {user && (
+                        <>
+                          <td className="px-4 py-3">
+                            {editingId === competitor.id ? (
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  value={weightInput}
+                                  onChange={(e) => setWeightInput(e.target.value)}
+                                  onKeyPress={(e) => e.key === 'Enter' && addWeight(competitor.id)}
+                                  placeholder="gramm"
+                                  className="w-24 px-2 py-1 border-2 border-blue-500 rounded focus:outline-none"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => addWeight(competitor.id)}
+                                  className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-semibold"
+                                >
+                                  OK
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingId(null);
+                                    setWeightInput('');
+                                  }}
+                                  className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm font-semibold"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setEditingId(competitor.id)}
+                                className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold"
+                              >
+                                Bevitel
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
                             <button
-                              onClick={() => addWeight(competitor.id)}
-                              className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-semibold"
+                              onClick={() => deleteCompetitor(competitor.id)}
+                              className="text-red-600 hover:text-red-800"
+                              title="Versenyző törlése"
                             >
-                              OK
+                              <Trash2 className="w-5 h-5" />
                             </button>
-                            <button
-                              onClick={() => {
-                                setEditingId(null);
-                                setWeightInput('');
-                              }}
-                              className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm font-semibold"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setEditingId(competitor.id)}
-                            className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold"
-                          >
-                            Bevitel
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => deleteCompetitor(competitor.id)}
-                          className="text-red-600 hover:text-red-800"
-                          title="Versenyző törlése"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </td>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   );
                 })}
@@ -715,39 +692,44 @@ export default function FishingCompetition() {
             {competitors.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <Fish className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p className="text-lg">Még nincsenek versenyzők. Adj hozzá versenyzőket a fenti mezőben!</p>
+                <p className="text-lg">Még nincsenek versenyzők.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Eredmények - ugyanaz mint előtt */}
-        <div className="grid md:grid-cols-2 gap-6 mb-6
+        {/* Eredmények */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow-lg p-6">
-        <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
-          <Trophy className="w-6 h-6 text-gray-400" />
-          4 halat fogottak (Top 6)
-        </h3>
-        {results.with4Fish.length > 0 ? (
-          <div className="space-y-2">
-            {results.with4Fish.map((c, i) => (
-              <div key={c.id} className="flex justify-between items-center p-3 rounded bg-gray-50">
-                <span className="font-semibold">
-                  <span className="text-2xl mr-2">{i + 1}.</span>
-                  {c.name}
-                </span>
-                <span className="font-bold text-blue-700 text-lg">
-                  {c.totalWeight} g
-                </span>
+            <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
+              <Trophy className="w-6 h-6 text-yellow-500" />
+              5 halat fogottak (Top 6)
+            </h3>
+            {results.with5Fish.length > 0 ? (
+              <div className="space-y-2">
+                {results.with5Fish.map((c, i) => (
+                  <div key={c.id} className={`flex justify-between items-center p-3 rounded ${
+                    i === 0 ? 'bg-yellow-100 border-2 border-yellow-400' :
+                    i === 1 ? 'bg-gray-100 border-2 border-gray-400' :
+                    i === 2 ? 'bg-orange-100 border-2 border-orange-400' :
+                    'bg-gray-50'
+                  }`}>
+                    <span className="font-semibold">
+                      <span className="text-2xl mr-2">{i + 1}.</span>
+                      {c.name}
+                    </span>
+                    <span className="font-bold text-green-700 text-lg">
+                      {c.totalWeight} g
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <p className="text-gray-400 text-center py-4">Még nincs 5 halat fogott versenyző</p>
+            )}
           </div>
-        ) : (
-          <p className="text-gray-400 text-center py-4">Még nincs 4 halat fogott versenyző</p>
-        )}
-      </div>
 
-      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-xl font-bold mb-4 text-purple-700 flex items-center gap-2">
           <Trophy className="w-6 h-6 text-bronze-400" />
           3 halat fogottak (Top 6)
