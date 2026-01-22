@@ -417,9 +417,10 @@ export default function FishingCompetition() {
             )}
           </div>
         </div>
+        {/* Eredmények */}
 {/* === IDE JÖN A 2. RÉSZ UTÁN === */}
 
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
+       <div className="grid md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-yellow-500" />
