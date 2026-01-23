@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, FolderOpen, PlusCircle, Lock } from 'lucide-react';
 
-// ⚠️ FONTOS: Cseréld ki ezeket a saját Supabase adataidra!
 const supabaseUrl = 'https://sskzueeefjcuqtuesojm.supabase.co';
 const supabaseKey = 'sb_publishable_8iZhmXZCwGJpkJaoEm7cZg_3WFhQwUa';
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -14,6 +13,7 @@ export default function FishingCompetition() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [showCompetitionList, setShowCompetitionList] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [competitions, setCompetitions] = useState([]);
   const [title, setTitle] = useState('Horgászverseny');
   const [competitors, setCompetitors] = useState([]);
@@ -31,16 +31,31 @@ export default function FishingCompetition() {
     return () => { authListener?.subscription?.unsubscribe(); };
   }, []);
 
-  // Keresd meg és CSERÉLD LE ezt a részt az 1. RÉSZBEN:
-
   const checkUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-      // Mindig töltse be a versenyeket (bejelentkezve vagy anélkül)
       await loadCompetitions();
     } catch (error) {
       console.error('Auth hiba:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      setUser(data.user);
+      setShowLoginModal(false);
+      setEmail('');
+      setPassword('');
+    } catch (error) {
+      setLoginError('Hibás email vagy jelszó');
     } finally {
       setLoading(false);
     }
@@ -50,17 +65,12 @@ export default function FishingCompetition() {
     try {
       await supabase.auth.signOut();
       setUser(null);
-      // NE töltse újra a versenyeket kijelentkezéskor!
-      // await loadCompetitions(); <- EZT TÖRÖLD
     } catch (error) {
       console.error('Kijelentkezési hiba:', error);
     }
   };
 
   const loadCompetitions = async () => {
-    // Ha nincs verseny, ne próbáljon betölteni
-    if (!supabase) return;
-    
     try {
       const { data, error } = await supabase.from('competitions').select('*').order('created_at', { ascending: false });
       if (error) throw error;
@@ -74,8 +84,8 @@ export default function FishingCompetition() {
   const createNewCompetition = async () => {
     try {
       const now = new Date();
-      const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
-      const { data, error } = await supabase.from('competitions').insert([{ title: `Horgászverseny - ${dateStr}` }]).select();
+      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0');
+      const { data, error } = await supabase.from('competitions').insert([{ title: 'Horgászverseny - ' + dateStr }]).select();
       if (error) throw error;
       setCompetitionId(data[0].id);
       setTitle(data[0].title);
@@ -165,7 +175,7 @@ export default function FishingCompetition() {
   const addWeight = async (competitorId) => {
     const weight = parseInt(weightInput);
     if (isNaN(weight) || weight <= 0) {
-      alert('Adj meg érvényes súlyt grammban!');
+      alert('Adj meg érvényes súlyt grammban');
       return;
     }
     try {
@@ -222,9 +232,6 @@ export default function FishingCompetition() {
       biggestFishList: withScores.filter(c => c.biggestFish > 0).sort((a, b) => b.biggestFish - a.biggestFish).slice(0, 5)
     };
   }, [competitors]);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  // === IDE JÖN AZ 1. RÉSZ UTÁN ===
-
   if (showCompetitionList && user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
@@ -244,10 +251,10 @@ export default function FishingCompetition() {
             <div className="space-y-3">
               {competitions.map((comp) => {
                 const date = new Date(comp.created_at);
-                const dateStr = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+                const dateStr = date.getFullYear() + '.' + String(date.getMonth() + 1).padStart(2, '0') + '.' + String(date.getDate()).padStart(2, '0');
                 const isActive = comp.id === competitionId;
                 return (
-                  <div key={comp.id} className={`border-2 rounded-lg p-4 flex justify-between items-center ${isActive ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                  <div key={comp.id} className={isActive ? 'border-2 rounded-lg p-4 flex justify-between items-center border-green-500 bg-green-50' : 'border-2 rounded-lg p-4 flex justify-between items-center border-gray-200 bg-white'}>
                     <div className="flex-1">
                       <h3 className="text-xl font-bold text-gray-800">{comp.title}</h3>
                       <p className="text-gray-600 text-sm">{dateStr}</p>
@@ -282,8 +289,15 @@ export default function FishingCompetition() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               <Fish className="w-10 h-10" />
-                {user ? (
-                <>
+              {user ? (
+                <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); saveTitle(e.target.value); }} className="text-4xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white placeholder-green-200 flex-1" placeholder="Verseny címe..." />
+              ) : (
+                <h1 className="text-4xl font-bold">{title}</h1>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {user ? (
+                <React.Fragment>
                   <button onClick={() => setShowCompetitionList(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
                     <FolderOpen className="w-5 h-5" />
                     <span className="font-semibold">Versenyek</span>
@@ -295,9 +309,9 @@ export default function FishingCompetition() {
                     <LogOut className="w-5 h-5" />
                     <span className="font-semibold">Kilépés</span>
                   </button>
-                </>
+                </React.Fragment>
               ) : (
-                <>
+                <React.Fragment>
                   <button onClick={() => setShowLoginModal(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
                     <Lock className="w-5 h-5" />
                     <span className="font-semibold">Admin</span>
@@ -305,24 +319,42 @@ export default function FishingCompetition() {
                   <button onClick={() => loadCompetition(competitionId)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
                     <RefreshCw className="w-6 h-6" />
                   </button>
-                </>
-              )}
-                <>
-                  <button onClick={() => { const e = prompt('Email:'); const p = prompt('Jelszó:'); if (e && p) { setEmail(e); setPassword(p); handleLogin({ preventDefault: () => {} }); }}} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
-                    <Lock className="w-5 h-5" />
-                    <span className="font-semibold">Admin</span>
-                  </button>
-                  <button onClick={() => loadCompetition(competitionId)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
-                    <RefreshCw className="w-6 h-6" />
-                  </button>
-                </>
+                </React.Fragment>
               )}
             </div>
           </div>
-         <p className="mt-2 text-green-100">
-                45 versenyző • 5 hal • Összsúly alapján {user && '• Admin: ' + user.email}
-</p>
+          <p className="mt-2 text-green-100">
+            45 versenyző • 5 hal • Összsúly alapján
+            {user && <span> • Admin: {user.email}</span>}
+          </p>
         </div>
+
+        {showLoginModal && !user && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Admin Bejelentkezés</h2>
+                <button onClick={() => setShowLoginModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+              </div>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Email cím</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="admin@example.com" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Jelszó</label>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="••••••••" required />
+                </div>
+                {loginError && (
+                  <div className="bg-red-100 border-2 border-red-400 text-red-700 px-4 py-3 rounded-lg">{loginError}</div>
+                )}
+                <button type="submit" disabled={loading} className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400">
+                  {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {user && (
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -352,10 +384,10 @@ export default function FishingCompetition() {
                   <th className="px-4 py-3 text-center font-semibold">5. hal (g)</th>
                   <th className="px-4 py-3 text-center font-semibold">Összsúly (g)</th>
                   {user && (
-                    <>
+                    <React.Fragment>
                       <th className="px-4 py-3 text-center font-semibold">Súly bevitel</th>
                       <th className="px-4 py-3 text-center font-semibold">Művelet</th>
-                    </>
+                    </React.Fragment>
                   )}
                 </tr>
               </thead>
@@ -384,7 +416,7 @@ export default function FishingCompetition() {
                         <span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-bold">{totalWeight} g</span>
                       </td>
                       {user && (
-                        <>
+                        <React.Fragment>
                           <td className="px-4 py-3">
                             {editingId === competitor.id ? (
                               <div className="flex gap-2">
@@ -401,7 +433,7 @@ export default function FishingCompetition() {
                               <Trash2 className="w-5 h-5" />
                             </button>
                           </td>
-                        </>
+                        </React.Fragment>
                       )}
                     </tr>
                   );
@@ -416,62 +448,7 @@ export default function FishingCompetition() {
             )}
           </div>
         </div>
-        {/* Eredmények */}
-{/* === IDE JÖN A 2. RÉSZ UTÁN === */}
- {/* Bejelentkezési Modal */}
-        {showLoginModal && !user && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Admin Bejelentkezés</h2>
-                <button onClick={() => setShowLoginModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">
-                  ✕
-                </button>
-              </div>
-              
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Email cím</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                    placeholder="admin@example.com"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Jelszó</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-
-                {loginError && (
-                  <div className="bg-red-100 border-2 border-red-400 text-red-700 px-4 py-3 rounded-lg">
-                    {loginError}
-                  </div>
-                )}
-                
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400"
-                >
-                  {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-       <div className="grid md:grid-cols-2 gap-6 mb-6">
+<div className="grid md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-yellow-500" />
@@ -480,8 +457,11 @@ export default function FishingCompetition() {
             {results.with5Fish.length > 0 ? (
               <div className="space-y-2">
                 {results.with5Fish.map((c, i) => (
-                  <div key={c.id} className={`flex justify-between items-center p-3 rounded ${i === 0 ? 'bg-yellow-100 border-2 border-yellow-400' : i === 1 ? 'bg-gray-100 border-2 border-gray-400' : i === 2 ? 'bg-orange-100 border-2 border-orange-400' : 'bg-gray-50'}`}>
-                    <span className="font-semibold"><span className="text-2xl mr-2">{i + 1}.</span>{c.name}</span>
+                  <div key={c.id} className={i === 0 ? 'flex justify-between items-center p-3 rounded bg-yellow-100 border-2 border-yellow-400' : i === 1 ? 'flex justify-between items-center p-3 rounded bg-gray-100 border-2 border-gray-400' : i === 2 ? 'flex justify-between items-center p-3 rounded bg-orange-100 border-2 border-orange-400' : 'flex justify-between items-center p-3 rounded bg-gray-50'}>
+                    <span className="font-semibold">
+                      <span className="text-2xl mr-2">{i + 1}.</span>
+                      {c.name}
+                    </span>
                     <span className="font-bold text-green-700 text-lg">{c.totalWeight} g</span>
                   </div>
                 ))}
@@ -500,7 +480,10 @@ export default function FishingCompetition() {
               <div className="space-y-2">
                 {results.with4Fish.map((c, i) => (
                   <div key={c.id} className="flex justify-between items-center p-3 rounded bg-gray-50">
-                    <span className="font-semibold"><span className="text-2xl mr-2">{i + 1}.</span>{c.name}</span>
+                    <span className="font-semibold">
+                      <span className="text-2xl mr-2">{i + 1}.</span>
+                      {c.name}
+                    </span>
                     <span className="font-bold text-blue-700 text-lg">{c.totalWeight} g</span>
                   </div>
                 ))}
@@ -519,7 +502,10 @@ export default function FishingCompetition() {
               <div className="space-y-2">
                 {results.with3Fish.map((c, i) => (
                   <div key={c.id} className="flex justify-between items-center p-3 rounded bg-gray-50">
-                    <span className="font-semibold"><span className="text-2xl mr-2">{i + 1}.</span>{c.name}</span>
+                    <span className="font-semibold">
+                      <span className="text-2xl mr-2">{i + 1}.</span>
+                      {c.name}
+                    </span>
                     <span className="font-bold text-purple-700 text-lg">{c.totalWeight} g</span>
                   </div>
                 ))}
@@ -537,8 +523,11 @@ export default function FishingCompetition() {
             {results.biggestFishList.length > 0 ? (
               <div className="space-y-2">
                 {results.biggestFishList.map((c, i) => (
-                  <div key={c.id} className={`flex justify-between items-center p-3 rounded ${i === 0 ? 'bg-red-100 border-2 border-red-400' : 'bg-gray-50'}`}>
-                    <span className="font-semibold"><span className="text-2xl mr-2">{i + 1}.</span>{c.name}</span>
+                  <div key={c.id} className={i === 0 ? 'flex justify-between items-center p-3 rounded bg-red-100 border-2 border-red-400' : 'flex justify-between items-center p-3 rounded bg-gray-50'}>
+                    <span className="font-semibold">
+                      <span className="text-2xl mr-2">{i + 1}.</span>
+                      {c.name}
+                    </span>
                     <span className="font-bold text-red-700 text-lg">{c.biggestFish} g</span>
                   </div>
                 ))}
