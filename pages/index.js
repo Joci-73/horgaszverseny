@@ -232,7 +232,7 @@ export default function FishingCompetition() {
       biggestFishList: withScores.filter(c => c.biggestFish > 0).sort((a, b) => b.biggestFish - a.biggestFish).slice(0, 5)
     };
   }, [competitors]);
-  if (showCompetitionList && user) {
+  if (showCompetitionList) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
         <div className="max-w-4xl mx-auto">
@@ -240,14 +240,18 @@ export default function FishingCompetition() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
                 <FolderOpen className="w-8 h-8 text-blue-600" />
-                Mentett Versenyek
+                {user ? 'Versenyek Kezelése' : 'Korábbi Versenyek'}
               </h2>
               <button onClick={() => setShowCompetitionList(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             </div>
-            <button onClick={createNewCompetition} className="w-full mb-6 bg-green-600 text-white py-4 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2">
-              <PlusCircle className="w-6 h-6" />
-              Új Verseny Indítása
-            </button>
+
+            {user && (
+              <button onClick={createNewCompetition} className="w-full mb-6 bg-green-600 text-white py-4 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2">
+                <PlusCircle className="w-6 h-6" />
+                Új Verseny Indítása
+              </button>
+            )}
+
             <div className="space-y-3">
               {competitions.map((comp) => {
                 const date = new Date(comp.created_at);
@@ -258,16 +262,31 @@ export default function FishingCompetition() {
                     <div className="flex-1">
                       <h3 className="text-xl font-bold text-gray-800">{comp.title}</h3>
                       <p className="text-gray-600 text-sm">{dateStr}</p>
-                      {isActive && <span className="inline-block mt-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">Aktív</span>}
+                      {isActive && <span className="inline-block mt-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">Aktuális</span>}
                     </div>
                     <div className="flex gap-2">
-                      {!isActive && <button onClick={() => loadCompetition(comp.id)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Betöltés</button>}
-                      <button onClick={() => deleteCompetition(comp.id)} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Törlés</button>
+                      {!isActive && (
+                        <button onClick={() => loadCompetition(comp.id)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                          Megnyitás
+                        </button>
+                      )}
+                      {user && (
+                        <button onClick={() => deleteCompetition(comp.id)} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
+                          Törlés
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {competitions.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <FolderOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg">Még nincsenek versenyek.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -296,30 +315,23 @@ export default function FishingCompetition() {
               )}
             </div>
             <div className="flex gap-2">
+              <button onClick={() => setShowCompetitionList(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
+                <FolderOpen className="w-5 h-5" />
+                <span className="font-semibold">Versenyek</span>
+              </button>
+              <button onClick={() => loadCompetition(competitionId)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
+                <RefreshCw className="w-6 h-6" />
+              </button>
               {user ? (
-                <React.Fragment>
-                  <button onClick={() => setShowCompetitionList(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
-                    <FolderOpen className="w-5 h-5" />
-                    <span className="font-semibold">Versenyek</span>
-                  </button>
-                  <button onClick={() => loadCompetition(competitionId)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
-                    <RefreshCw className="w-6 h-6" />
-                  </button>
-                  <button onClick={handleLogout} className="p-2 bg-red-500 bg-opacity-80 rounded-lg hover:bg-opacity-100 flex items-center gap-2 px-4">
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-semibold">Kilépés</span>
-                  </button>
-                </React.Fragment>
+                <button onClick={handleLogout} className="p-2 bg-red-500 bg-opacity-80 rounded-lg hover:bg-opacity-100 flex items-center gap-2 px-4">
+                  <LogOut className="w-5 h-5" />
+                  <span className="font-semibold">Kilépés</span>
+                </button>
               ) : (
-                <React.Fragment>
-                  <button onClick={() => setShowLoginModal(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
-                    <Lock className="w-5 h-5" />
-                    <span className="font-semibold">Admin</span>
-                  </button>
-                  <button onClick={() => loadCompetition(competitionId)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
-                    <RefreshCw className="w-6 h-6" />
-                  </button>
-                </React.Fragment>
+                <button onClick={() => setShowLoginModal(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
+                  <Lock className="w-5 h-5" />
+                  <span className="font-semibold">Admin</span>
+                </button>
               )}
             </div>
           </div>
