@@ -319,7 +319,7 @@ export default function FishingCompetition() {
               )}
             </div>
           </div>
-          <p className="mt-2 text-green-100">
+         <p className="mt-2 text-green-100">
             45 versenyző • 5 hal • Összsúly alapján
             {user && <span> • Admin: {user.email}</span>}
           </p>
