@@ -31,28 +31,16 @@ export default function FishingCompetition() {
     return () => { authListener?.subscription?.unsubscribe(); };
   }, []);
 
+  // Keresd meg és CSERÉLD LE ezt a részt az 1. RÉSZBEN:
+
   const checkUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
+      // Mindig töltse be a versenyeket (bejelentkezve vagy anélkül)
       await loadCompetitions();
     } catch (error) {
       console.error('Auth hiba:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      setUser(data.user);
-    } catch (error) {
-      setLoginError('Hibás email vagy jelszó!');
     } finally {
       setLoading(false);
     }
@@ -62,12 +50,17 @@ export default function FishingCompetition() {
     try {
       await supabase.auth.signOut();
       setUser(null);
+      // NE töltse újra a versenyeket kijelentkezéskor!
+      // await loadCompetitions(); <- EZT TÖRÖLD
     } catch (error) {
       console.error('Kijelentkezési hiba:', error);
     }
   };
 
   const loadCompetitions = async () => {
+    // Ha nincs verseny, ne próbáljon betölteni
+    if (!supabase) return;
+    
     try {
       const { data, error } = await supabase.from('competitions').select('*').order('created_at', { ascending: false });
       if (error) throw error;
