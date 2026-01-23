@@ -222,6 +222,7 @@ export default function FishingCompetition() {
       biggestFishList: withScores.filter(c => c.biggestFish > 0).sort((a, b) => b.biggestFish - a.biggestFish).slice(0, 5)
     };
   }, [competitors]);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   // === IDE JÖN AZ 1. RÉSZ UTÁN ===
 
   if (showCompetitionList && user) {
@@ -281,14 +282,7 @@ export default function FishingCompetition() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               <Fish className="w-10 h-10" />
-              {user ? (
-                <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); saveTitle(e.target.value); }} className="text-4xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white placeholder-green-200 flex-1" placeholder="Verseny címe..." />
-              ) : (
-                <h1 className="text-4xl font-bold">{title}</h1>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {user ? (
+                {user ? (
                 <>
                   <button onClick={() => setShowCompetitionList(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
                     <FolderOpen className="w-5 h-5" />
@@ -303,6 +297,16 @@ export default function FishingCompetition() {
                   </button>
                 </>
               ) : (
+                <>
+                  <button onClick={() => setShowLoginModal(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
+                    <Lock className="w-5 h-5" />
+                    <span className="font-semibold">Admin</span>
+                  </button>
+                  <button onClick={() => loadCompetition(competitionId)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
+                    <RefreshCw className="w-6 h-6" />
+                  </button>
+                </>
+              )}
                 <>
                   <button onClick={() => { const e = prompt('Email:'); const p = prompt('Jelszó:'); if (e && p) { setEmail(e); setPassword(p); handleLogin({ preventDefault: () => {} }); }}} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
                     <Lock className="w-5 h-5" />
@@ -412,7 +416,59 @@ export default function FishingCompetition() {
         </div>
         {/* Eredmények */}
 {/* === IDE JÖN A 2. RÉSZ UTÁN === */}
+ {/* Bejelentkezési Modal */}
+        {showLoginModal && !user && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Admin Bejelentkezés</h2>
+                <button onClick={() => setShowLoginModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">
+                  ✕
+                </button>
+              </div>
+              
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Email cím</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                    placeholder="admin@example.com"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Jelszó</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
 
+                {loginError && (
+                  <div className="bg-red-100 border-2 border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                    {loginError}
+                  </div>
+                )}
+                
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400"
+                >
+                  {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
        <div className="grid md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
