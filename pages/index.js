@@ -34,10 +34,25 @@ export default function FishingCompetition() {
 
   const toggleAll = () => {
     const newVal = !resultsVisible.all;
-    setResultsVisible({ all: newVal, fish5: newVal, fish4: newVal, fish3: newVal, biggest: newVal });
+    const newState = { all: newVal, fish5: newVal, fish4: newVal, fish3: newVal, biggest: newVal };
+    setResultsVisible(newState);
+    saveResultsVisible(newState);
   };
+
   const toggleOne = (key) => {
-    setResultsVisible(prev => ({ ...prev, [key]: !prev[key] }));
+    const newState = { ...resultsVisible, [key]: !resultsVisible[key] };
+    // all = true csak ha mind true
+    newState.all = newState.fish5 && newState.fish4 && newState.fish3 && newState.biggest;
+    setResultsVisible(newState);
+    saveResultsVisible(newState);
+  };
+
+  const saveResultsVisible = async (state) => {
+    if (!competitionId) return;
+    try {
+      const { fish5, fish4, fish3, biggest } = state;
+      await supabase.from('competitions').update({ results_visible: { fish5, fish4, fish3, biggest } }).eq('id', competitionId);
+    } catch (err) { console.error('Láthatóság mentési hiba:', err); }
   };
 
   useEffect(() => {
@@ -129,6 +144,17 @@ export default function FishingCompetition() {
       if (ce) throw ce;
       setCompetitionId(comp.id);
       setTitle(comp.title);
+      // Betöltjük a mentett láthatósági beállításokat
+      if (comp.results_visible) {
+        const rv = comp.results_visible;
+        setResultsVisible({
+          fish5: rv.fish5 !== false,
+          fish4: rv.fish4 !== false,
+          fish3: rv.fish3 !== false,
+          biggest: rv.biggest !== false,
+          all: rv.fish5 !== false && rv.fish4 !== false && rv.fish3 !== false && rv.biggest !== false
+        });
+      }
       const built = await buildCompetitors(comp.id);
       setCompetitors(built);
       setShowCompetitionList(false);
