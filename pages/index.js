@@ -479,34 +479,34 @@ export default function FishingCompetition() {
 
         {/* Fejléc */}
         <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-lg shadow-xl mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1">
-              <Fish className="w-10 h-10" />
-              {user
-                ? <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); saveTitle(e.target.value); }} className="text-4xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white flex-1" placeholder="Verseny címe..." />
-                : <h1 className="text-4xl font-bold">{title}</h1>}
-            </div>
-            <div className="flex gap-2 flex-wrap justify-end">
-              <button onClick={() => setShowCompetitionList(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
-                <FolderOpen className="w-5 h-5" /><span className="font-semibold">Versenyek</span>
-              </button>
-              <button onClick={handleShare} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4">
-                <Share2 className="w-5 h-5" /><span className="font-semibold">Megosztás</span>
-              </button>
-              <button onClick={() => loadCompetition(competitionId)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30">
-                <RefreshCw className="w-6 h-6" />
-              </button>
-              {user && (
-                <button onClick={archiveCompetition} className="p-2 bg-amber-500 bg-opacity-90 rounded-lg hover:bg-opacity-100 flex items-center gap-2 px-4">
-                  <Archive className="w-5 h-5" /><span className="font-semibold">Lezárás</span>
-                </button>
-              )}
-              {user
-                ? <button onClick={handleLogout} className="p-2 bg-red-500 bg-opacity-80 rounded-lg hover:bg-opacity-100 flex items-center gap-2 px-4"><LogOut className="w-5 h-5" /><span className="font-semibold">Kilépés</span></button>
-                : <button onClick={() => setShowLoginModal(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 flex items-center gap-2 px-4"><Lock className="w-5 h-5" /><span className="font-semibold">Admin</span></button>}
-            </div>
+          <div className="flex items-center gap-3">
+            <Fish className="w-10 h-10" />
+            {user
+              ? <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); saveTitle(e.target.value); }} className="text-4xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white flex-1" placeholder="Verseny címe..." />
+              : <h1 className="text-4xl font-bold">{title}</h1>}
           </div>
           <p className="mt-2 text-green-100">45 versenyző • 5 hal • Összsúly alapján{user && <span> • Admin: {user.email}</span>}</p>
+        </div>
+
+        {/* Gombok sor - fejléc alatt */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button onClick={() => setShowCompetitionList(true)} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md">
+            <FolderOpen className="w-4 h-4" />Versenyek
+          </button>
+          <button onClick={handleShare} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md">
+            <Share2 className="w-4 h-4" />Megosztás
+          </button>
+          <button onClick={() => loadCompetition(competitionId)} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md">
+            <RefreshCw className="w-4 h-4" />Frissítés
+          </button>
+          {user && (
+            <button onClick={archiveCompetition} className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-semibold flex items-center gap-2 shadow-md">
+              <Archive className="w-4 h-4" />Verseny Lezárása
+            </button>
+          )}
+          {user
+            ? <button onClick={handleLogout} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-semibold flex items-center gap-2 shadow-md"><LogOut className="w-4 h-4" />Kilépés</button>
+            : <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold flex items-center gap-2 shadow-md"><Lock className="w-4 h-4" />Admin</button>}
         </div>
 
         {/* Login Modal */}
