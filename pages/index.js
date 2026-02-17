@@ -24,7 +24,7 @@ export default function FishingCompetition() {
   const [editingId, setEditingId] = useState(null);
   const [weightInput, setWeightInput] = useState('');
   const [competitionId, setCompetitionId] = useState(null);
-  const [editingCatch, setEditingCatch] = useState(null); // { competitorId, catchIndex, value }
+  const [editingCatch, setEditingCatch] = useState(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -32,9 +32,8 @@ export default function FishingCompetition() {
   const [archivedCompetitors, setArchivedCompetitors] = useState([]);
   const [showShareToast, setShowShareToast] = useState(false);
   const [pageViews, setPageViews] = useState({ today: 0, week: 0, total: 0, mobil: 0, pc: 0 });
-  // Dinamikus beállítások
   const [maxFish, setMaxFish] = useState(DEFAULT_MAX_FISH);
-  const [topSettings, setTopSettings] = useState({}); // { "10": 6, "9": 6, ... "biggest": 5 }
+  const [topSettings, setTopSettings] = useState({});
   const [resultsVisible, setResultsVisible] = useState({});
   const [showSettings, setShowSettings] = useState(false);
 
@@ -48,7 +47,6 @@ export default function FishingCompetition() {
     return () => { authListener?.subscription?.unsubscribe(); };
   }, []);
 
-  // Alapértelmezett topSettings és resultsVisible generálása maxFish alapján
   const buildDefaults = (mf) => {
     const ts = {};
     const rv = {};
@@ -105,13 +103,15 @@ export default function FishingCompetition() {
     try { await supabase.auth.signOut(); setUser(null); } catch (err) { console.error(err); }
   };
 
+  // FIX 2: limit catches to mf so fishCount is always accurate
   const buildCompetitors = async (compId, mf) => {
     const { data: cd, error: ce } = await supabase.from('competitors').select('*').eq('competition_id', compId).order('created_at', { ascending: true });
     if (ce) throw ce;
     return Promise.all((cd || []).map(async (c) => {
       const { data: catches, error: catchErr } = await supabase.from('catches').select('*').eq('competitor_id', c.id).order('weight', { ascending: false });
       if (catchErr) throw catchErr;
-      return { ...c, catches: catches.map(x => x.weight) };
+      // Limit to mf entries (heaviest first) to fix toplist grouping
+      return { ...c, catches: catches.slice(0, mf).map(x => x.weight) };
     }));
   };
 
@@ -138,7 +138,6 @@ export default function FishingCompetition() {
       const { ts: defTs, rv: defRv } = buildDefaults(mf);
       const savedTs = comp.top_settings || defTs;
       const savedRv = comp.results_visible || defRv;
-      // Sync keys with current maxFish
       const mergedTs = { ...defTs, ...savedTs };
       const mergedRv = { ...defRv, ...savedRv };
       setTopSettings(mergedTs);
@@ -303,6 +302,8 @@ export default function FishingCompetition() {
     } catch (err) { alert('Hiba: ' + err.message); }
   };
 
+  // FIX 1: addWeight function declaration was completely missing — restored as async
+  const addWeight = async (competitorId) => {
     const weight = parseInt(weightInput);
     if (isNaN(weight) || weight <= 0) { alert('Adj meg érvényes súlyt grammban'); return; }
     try {
@@ -339,19 +340,16 @@ export default function FishingCompetition() {
     } else alert('Másold ki a böngésző címsorából az URL-t!');
   };
 
-  // Eredmények számítása
   const results = useMemo(() => {
     const withScores = competitors.map(c => ({
       ...c,
       totalWeight: c.catches.reduce((s, w) => s + w, 0),
       fishCount: c.catches.length,
     }));
-    // Minden halszámhoz lista
     const byCount = {};
     for (let i = maxFish; i >= 1; i--) {
       byCount[i] = withScores.filter(c => c.fishCount === i).sort((a, b) => b.totalWeight - a.totalWeight);
     }
-    // Legnagyobb hal - minden egyes fogás külön versenyez
     const allCatches = [];
     competitors.forEach(c => c.catches.forEach(w => allCatches.push({ name: c.name, weight: w })));
     const biggestList = allCatches.sort((a, b) => b.weight - a.weight);
@@ -398,7 +396,6 @@ export default function FishingCompetition() {
             <button onClick={() => { setShowArchived(false); setArchivedCompetition(null); }} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold shadow-md">← Vissza</button>
             {user && <button onClick={() => unarchiveCompetition(archivedCompetition.id)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center gap-2 shadow-md"><RefreshCw className="w-4 h-4" />Visszaállítás</button>}
           </div>
-          {/* Archív táblázat */}
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6 overflow-x-auto">
             <h2 className="text-2xl font-bold mb-4">Versenyzők és Fogások</h2>
             <table className="w-full">
@@ -422,7 +419,6 @@ export default function FishingCompetition() {
               </tbody>
             </table>
           </div>
-          {/* Archív eredmények */}
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             {Array.from({ length: mf }, (_, i) => mf - i).map((n, ci) => {
               const list = archivedResults.byCount[n] || [];
@@ -594,7 +590,6 @@ export default function FishingCompetition() {
             </div>
             {showSettings && (
               <div>
-                {/* Hány halas */}
                 <div className="flex items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <Fish className="w-5 h-5 text-blue-600" />
                   <span className="font-semibold text-gray-700">Hány halas a verseny?</span>
@@ -604,7 +599,6 @@ export default function FishingCompetition() {
                     <button onClick={() => handleMaxFishChange(maxFish + 1)} disabled={maxFish >= 10} className="w-8 h-8 bg-blue-200 text-blue-800 rounded-full font-bold hover:bg-blue-300 disabled:opacity-40">+</button>
                   </div>
                 </div>
-                {/* TOP beállítások + láthatóság */}
                 <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Eredmény táblák — TOP szám és láthatóság</p>
                 <div className="space-y-2">
                   {Array.from({ length: maxFish }, (_, i) => maxFish - i).map((n, ci) => (
@@ -621,7 +615,6 @@ export default function FishingCompetition() {
                       </button>
                     </div>
                   ))}
-                  {/* Legnagyobb hal sor */}
                   <div className={`flex items-center gap-3 p-2 rounded-lg border-2 ${resultsVisible['biggest'] ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'}`}>
                     <span className="font-semibold text-sm text-red-700 w-32">Legnagyobb hal</span>
                     <div className="flex items-center gap-1 ml-auto">
@@ -634,7 +627,6 @@ export default function FishingCompetition() {
                       {resultsVisible['biggest'] ? <><EyeOff className="w-3 h-3" />Elrejt</> : <><Eye className="w-3 h-3" />Mutat</>}
                     </button>
                   </div>
-                  {/* Mindent mutat/rejt */}
                   <div className="flex justify-end mt-2">
                     <button onClick={toggleAllVisible} className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 ${Object.values(resultsVisible).some(v=>v) ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-600 text-white hover:bg-green-700'}`}>
                       {Object.values(resultsVisible).some(v=>v) ? <><EyeOff className="w-4 h-4" />Mindent elrejt</> : <><Eye className="w-4 h-4" />Mindent mutat</>}
