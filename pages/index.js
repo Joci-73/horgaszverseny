@@ -24,6 +24,8 @@ export default function FishingCompetition() {
   const [editingId, setEditingId] = useState(null);
   const [weightInput, setWeightInput] = useState('');
   const [competitionId, setCompetitionId] = useState(null);
+  const [editingCatch, setEditingCatch] = useState(null); // { competitorId, catchIndex, value }
+
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedCompetition, setArchivedCompetition] = useState(null);
@@ -283,7 +285,24 @@ export default function FishingCompetition() {
     finally { setDeleteConfirm(null); }
   };
 
-  const addWeight = async (competitorId) => {
+  const updateCatch = async (competitorId, catchIndex, newWeight) => {
+    const w = parseInt(newWeight);
+    if (isNaN(w) || w <= 0) { alert('Adj meg érvényes súlyt grammban'); return; }
+    try {
+      const competitor = competitors.find(c => c.id === competitorId);
+      const oldWeight = competitor.catches[catchIndex];
+      const { data: toUpdate } = await supabase.from('catches').select('*').eq('competitor_id', competitorId).eq('weight', oldWeight).limit(1);
+      if (toUpdate && toUpdate.length > 0) {
+        await supabase.from('catches').update({ weight: w }).eq('id', toUpdate[0].id);
+      }
+      const newCatches = [...competitor.catches];
+      newCatches[catchIndex] = w;
+      newCatches.sort((a, b) => b - a);
+      setCompetitors(prev => prev.map(c => c.id === competitorId ? { ...c, catches: newCatches } : c));
+      setEditingCatch(null);
+    } catch (err) { alert('Hiba: ' + err.message); }
+  };
+
     const weight = parseInt(weightInput);
     if (isNaN(weight) || weight <= 0) { alert('Adj meg érvényes súlyt grammban'); return; }
     try {
@@ -661,7 +680,28 @@ export default function FishingCompetition() {
                       <td className="px-4 py-3 text-center"><span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold">{c.catches.length}</span></td>
                       {Array.from({ length: maxFish }, (_, i) => (
                         <td key={i} className="px-4 py-3 text-center">
-                          {c.catches[i] ? <div className="flex items-center justify-center gap-1"><span className="font-semibold text-green-700">{c.catches[i]} g</span>{user && <button onClick={() => removeCatch(c.id, i)} className="text-red-500 hover:text-red-700 ml-1">×</button>}</div> : <span className="text-gray-300">-</span>}
+                          {c.catches[i] ? (
+                            <div className="flex items-center justify-center gap-1">
+                              {user && editingCatch && editingCatch.competitorId === c.id && editingCatch.catchIndex === i ? (
+                                <div className="flex gap-1 items-center">
+                                  <input type="number" step="1" value={editingCatch.value} onChange={(e) => setEditingCatch({ ...editingCatch, value: e.target.value })} onKeyPress={(e) => e.key === 'Enter' && updateCatch(c.id, i, editingCatch.value)} className="w-20 px-1 py-0.5 border-2 border-green-500 rounded text-center text-sm focus:outline-none" autoFocus />
+                                  <button onClick={() => updateCatch(c.id, i, editingCatch.value)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-xs font-semibold">✓</button>
+                                  <button onClick={() => setEditingCatch(null)} className="px-1.5 py-0.5 bg-gray-400 text-white rounded text-xs">✕</button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span
+                                    className={`font-semibold text-green-700 ${user ? 'cursor-pointer hover:text-blue-600 hover:underline' : ''}`}
+                                    onClick={() => user && setEditingCatch({ competitorId: c.id, catchIndex: i, value: c.catches[i] })}
+                                    title={user ? 'Kattints a szerkesztéshez' : ''}
+                                  >
+                                    {c.catches[i]} g
+                                  </span>
+                                  {user && <button onClick={() => removeCatch(c.id, i)} className="text-red-500 hover:text-red-700 ml-1">×</button>}
+                                </>
+                              )}
+                            </div>
+                          ) : <span className="text-gray-300">-</span>}
                         </td>
                       ))}
                       <td className="px-4 py-3 text-center"><span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-bold">{total} g</span></td>
