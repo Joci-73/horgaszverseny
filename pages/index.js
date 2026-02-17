@@ -28,7 +28,17 @@ export default function FishingCompetition() {
   const [archivedCompetitors, setArchivedCompetitors] = useState([]);
   const [showShareToast, setShowShareToast] = useState(false);
   const [pageViews, setPageViews] = useState({ today: 0, week: 0, total: 0, mobil: 0, pc: 0 });
-  const [resultsVisible, setResultsVisible] = useState(true);
+  const [resultsVisible, setResultsVisible] = useState({
+    all: true, fish5: true, fish4: true, fish3: true, biggest: true
+  });
+
+  const toggleAll = () => {
+    const newVal = !resultsVisible.all;
+    setResultsVisible({ all: newVal, fish5: newVal, fish4: newVal, fish3: newVal, biggest: newVal });
+  };
+  const toggleOne = (key) => {
+    setResultsVisible(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     trackVisit();
@@ -581,16 +591,30 @@ export default function FishingCompetition() {
 
         {/* Eredmény elrejtés/megjelenítés - csak adminnak */}
         {user && (
-          <div className="bg-white rounded-lg shadow-lg p-4 mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">Eredmény táblázatok</h2>
-              <p className="text-sm text-gray-500">{resultsVisible ? 'Jelenleg látható a látogatóknak' : 'Jelenleg el van rejtve a látogatóktól'}</p>
+          <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-gray-800">Eredmény táblázatok vezérlése</h2>
+              <button onClick={toggleAll}
+                className={resultsVisible.all ? 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-semibold flex items-center gap-2 text-sm' : 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center gap-2 text-sm'}>
+                {resultsVisible.all ? <><EyeOff className="w-4 h-4" />Mindent elrejt</> : <><Eye className="w-4 h-4" />Mindent mutat</>}
+              </button>
             </div>
-            <button
-              onClick={() => setResultsVisible(!resultsVisible)}
-              className={resultsVisible ? 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-semibold flex items-center gap-2' : 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center gap-2'}>
-              {resultsVisible ? <><EyeOff className="w-5 h-5" />Elrejtés</> : <><Eye className="w-5 h-5" />Megjelenítés</>}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: 'fish5', label: '5 halat fogottak' },
+                { key: 'fish4', label: '4 halat fogottak' },
+                { key: 'fish3', label: '3 halat fogottak' },
+                { key: 'biggest', label: 'Legnagyobb hal' },
+              ].map(({ key, label }) => (
+                <div key={key} className={resultsVisible[key] ? 'flex items-center justify-between p-2 rounded-lg border-2 border-green-200 bg-green-50' : 'flex items-center justify-between p-2 rounded-lg border-2 border-gray-200 bg-gray-50'}>
+                  <span className="text-sm font-semibold text-gray-700">{label}</span>
+                  <button onClick={() => toggleOne(key)}
+                    className={resultsVisible[key] ? 'px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs flex items-center gap-1' : 'px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs flex items-center gap-1'}>
+                    {resultsVisible[key] ? <><EyeOff className="w-3 h-3" />Elrejt</> : <><Eye className="w-3 h-3" />Mutat</>}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -653,26 +677,95 @@ export default function FishingCompetition() {
         </div>
 
         {/* Eredmény táblázatok - admin mindig látja, felhasználó csak ha engedélyezett */}
-        {(user || resultsVisible) ? (
-          <div>
-            {!user && !resultsVisible ? null : (
-              user && !resultsVisible ? (
-                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 mb-4 text-center">
-                  <EyeOff className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-                  <p className="text-yellow-700 font-bold">Az eredmény táblázatok el vannak rejtve a látogatók elől</p>
-                  <p className="text-yellow-600 text-sm">Te adminként látod az eredményeket, de a látogatók nem.</p>
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          {/* 5 halat fogottak */}
+          {(user || resultsVisible.fish5) ? (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              {user && !resultsVisible.fish5 && (
+                <div className="flex items-center gap-2 mb-3 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1">
+                  <EyeOff className="w-4 h-4 text-yellow-500" />
+                  <span className="text-xs text-yellow-600 font-semibold">Látogatók elől elrejtve</span>
                 </div>
-              ) : null
-            )}
-            <ResultsBlock res={results} />
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center mb-6">
-            <EyeOff className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-500 mb-2">Az eredmények jelenleg nem láthatók</h3>
-            <p className="text-gray-400">A szervező hamarosan közzéteszi az eredményeket.</p>
-          </div>
-        )}
+              )}
+              <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2"><Trophy className="w-6 h-6 text-yellow-500" />5 halat fogottak (Top 6)</h3>
+              {results.with5Fish.length > 0
+                ? <div className="space-y-2">{results.with5Fish.map((c, i) => (<div key={c.id} className={placeStyle(i)}><span className="font-semibold"><span className="text-2xl mr-2">{i+1}.</span>{c.name}</span><span className="font-bold text-green-700 text-lg">{c.totalWeight} g</span></div>))}</div>
+                : <p className="text-gray-400 text-center py-4">Még nincs 5 halat fogott versenyző</p>}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center justify-center text-center">
+              <EyeOff className="w-10 h-10 text-gray-300 mb-2" />
+              <p className="font-bold text-gray-400">5 halat fogottak</p>
+              <p className="text-sm text-gray-300">Eredmény hamarosan</p>
+            </div>
+          )}
+
+          {/* 4 halat fogottak */}
+          {(user || resultsVisible.fish4) ? (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              {user && !resultsVisible.fish4 && (
+                <div className="flex items-center gap-2 mb-3 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1">
+                  <EyeOff className="w-4 h-4 text-yellow-500" />
+                  <span className="text-xs text-yellow-600 font-semibold">Látogatók elől elrejtve</span>
+                </div>
+              )}
+              <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2"><Trophy className="w-6 h-6 text-gray-400" />4 halat fogottak (Top 6)</h3>
+              {results.with4Fish.length > 0
+                ? <div className="space-y-2">{results.with4Fish.map((c, i) => (<div key={c.id} className={placeStyle(i)}><span className="font-semibold"><span className="text-2xl mr-2">{i+1}.</span>{c.name}</span><span className="font-bold text-blue-700 text-lg">{c.totalWeight} g</span></div>))}</div>
+                : <p className="text-gray-400 text-center py-4">Még nincs 4 halat fogott versenyző</p>}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center justify-center text-center">
+              <EyeOff className="w-10 h-10 text-gray-300 mb-2" />
+              <p className="font-bold text-gray-400">4 halat fogottak</p>
+              <p className="text-sm text-gray-300">Eredmény hamarosan</p>
+            </div>
+          )}
+
+          {/* 3 halat fogottak */}
+          {(user || resultsVisible.fish3) ? (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              {user && !resultsVisible.fish3 && (
+                <div className="flex items-center gap-2 mb-3 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1">
+                  <EyeOff className="w-4 h-4 text-yellow-500" />
+                  <span className="text-xs text-yellow-600 font-semibold">Látogatók elől elrejtve</span>
+                </div>
+              )}
+              <h3 className="text-xl font-bold mb-4 text-purple-700 flex items-center gap-2"><Trophy className="w-6 h-6" />3 halat fogottak (Top 6)</h3>
+              {results.with3Fish.length > 0
+                ? <div className="space-y-2">{results.with3Fish.map((c, i) => (<div key={c.id} className={placeStyle(i)}><span className="font-semibold"><span className="text-2xl mr-2">{i+1}.</span>{c.name}</span><span className="font-bold text-purple-700 text-lg">{c.totalWeight} g</span></div>))}</div>
+                : <p className="text-gray-400 text-center py-4">Még nincs 3 halat fogott versenyző</p>}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center justify-center text-center">
+              <EyeOff className="w-10 h-10 text-gray-300 mb-2" />
+              <p className="font-bold text-gray-400">3 halat fogottak</p>
+              <p className="text-sm text-gray-300">Eredmény hamarosan</p>
+            </div>
+          )}
+
+          {/* Legnagyobb hal */}
+          {(user || resultsVisible.biggest) ? (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              {user && !resultsVisible.biggest && (
+                <div className="flex items-center gap-2 mb-3 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1">
+                  <EyeOff className="w-4 h-4 text-yellow-500" />
+                  <span className="text-xs text-yellow-600 font-semibold">Látogatók elől elrejtve</span>
+                </div>
+              )}
+              <h3 className="text-xl font-bold mb-4 text-red-700 flex items-center gap-2"><Fish className="w-6 h-6 text-red-500" />Legnagyobb hal (Top 5)</h3>
+              {results.biggestFishList.length > 0
+                ? <div className="space-y-2">{results.biggestFishList.map((c, i) => (<div key={c.id} className={i===0?'flex justify-between items-center p-3 rounded bg-red-100 border-2 border-red-400':'flex justify-between items-center p-3 rounded bg-gray-50'}><span className="font-semibold"><span className="text-2xl mr-2">{i+1}.</span>{c.name}</span><span className="font-bold text-red-700 text-lg">{c.biggestFish} g</span></div>))}</div>
+                : <p className="text-gray-400 text-center py-4">Még nincs fogott hal</p>}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center justify-center text-center">
+              <EyeOff className="w-10 h-10 text-gray-300 mb-2" />
+              <p className="font-bold text-gray-400">Legnagyobb hal</p>
+              <p className="text-sm text-gray-300">Eredmény hamarosan</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
