@@ -563,24 +563,6 @@ export default function FishingCompetition() {
           </div>
         )}
 
-        {/* Látogatószámláló */}
-        {user && (
-          <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-            <h2 className="text-lg font-bold mb-3 text-gray-800 flex items-center gap-2">👁️ Látogatók Statisztikája<button onClick={loadPageViews} className="ml-auto px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs flex items-center gap-1"><RefreshCw className="w-3 h-3" />Frissítés</button></h2>
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-blue-700">{pageViews.today}</p><p className="text-xs text-blue-500 font-semibold mt-1">Mai látogatás</p></div>
-              <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-green-700">{pageViews.week}</p><p className="text-xs text-green-500 font-semibold mt-1">Elmúlt 7 nap</p></div>
-              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-purple-700">{pageViews.total}</p><p className="text-xs text-purple-500 font-semibold mt-1">Összes látogatás</p></div>
-            </div>
-            <div className="border-t border-gray-100 pt-3"><p className="text-xs font-bold text-gray-500 mb-2 uppercase">Eszköz szerinti bontás</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-orange-600">📱 {pageViews.mobil}</p><p className="text-xs text-orange-500 font-semibold mt-1">Mobil</p><p className="text-xs text-gray-400">{pageViews.total > 0 ? Math.round((pageViews.mobil/pageViews.total)*100) : 0}%</p></div>
-                <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-gray-600">💻 {pageViews.pc}</p><p className="text-xs text-gray-500 font-semibold mt-1">PC</p><p className="text-xs text-gray-400">{pageViews.total > 0 ? Math.round((pageViews.pc/pageViews.total)*100) : 0}%</p></div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Admin beállítások */}
         {user && (
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
@@ -755,6 +737,24 @@ export default function FishingCompetition() {
             </div>
           )}
         </div>
+
+        {/* Látogatószámláló */}
+        {user && (
+          <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+            <h2 className="text-lg font-bold mb-3 text-gray-800 flex items-center gap-2">👁️ Látogatók Statisztikája<button onClick={loadPageViews} className="ml-auto px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs flex items-center gap-1"><RefreshCw className="w-3 h-3" />Frissítés</button></h2>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-blue-700">{pageViews.today}</p><p className="text-xs text-blue-500 font-semibold mt-1">Mai látogatás</p></div>
+              <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-green-700">{pageViews.week}</p><p className="text-xs text-green-500 font-semibold mt-1">Elmúlt 7 nap</p></div>
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-purple-700">{pageViews.total}</p><p className="text-xs text-purple-500 font-semibold mt-1">Összes látogatás</p></div>
+            </div>
+            <div className="border-t border-gray-100 pt-3"><p className="text-xs font-bold text-gray-500 mb-2 uppercase">Eszköz szerinti bontás</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-orange-600">📱 {pageViews.mobil}</p><p className="text-xs text-orange-500 font-semibold mt-1">Mobil</p><p className="text-xs text-gray-400">{pageViews.total > 0 ? Math.round((pageViews.mobil/pageViews.total)*100) : 0}%</p></div>
+                <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-gray-600">💻 {pageViews.pc}</p><p className="text-xs text-gray-500 font-semibold mt-1">PC</p><p className="text-xs text-gray-400">{pageViews.total > 0 ? Math.round((pageViews.pc/pageViews.total)*100) : 0}%</p></div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
