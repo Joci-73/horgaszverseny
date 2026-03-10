@@ -587,6 +587,8 @@ export default function FishingCompetition() {
       setCompetitors(prev => prev.map(c => c.id === competitorId ? { ...c, start_number: n } : c));
     } catch (e) { alert('Hiba: ' + e.message); }
   };
+
+  const executeDeleteCompetitor = async () => {
     if (!deleteConfirm) return;
     try {
       await supabase.from('competitors').delete().eq('id', deleteConfirm.id);
