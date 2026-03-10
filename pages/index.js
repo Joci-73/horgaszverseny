@@ -553,6 +553,8 @@ export default function FishingCompetition() {
       setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, image_url: '' } : c));
     } catch (e) { alert('Törlési hiba: ' + e.message); }
   };
+
+  const archiveCompetition = async () => {
     if (!competitionId || !window.confirm('Biztosan lezárod és archiválod?')) return;
     try { await supabase.from('competitions').update({ archived: true }).eq('id', competitionId); await loadCompetitions(); }
     catch (e) { alert('Hiba: ' + e.message); }
