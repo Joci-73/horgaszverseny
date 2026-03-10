@@ -281,6 +281,45 @@ const RegRow = ({ reg, onAdd, alreadyAdded }) => {
   );
 };
 
+// ── RAJTSZÁM CELLA (szerkeszthető, fogásbeviteli táblában) ────────────────────
+const StartNumberCell = ({ competitor, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(competitor.start_number ? String(competitor.start_number) : '');
+
+  const handleSave = () => {
+    onSave(competitor.id, val);
+    setEditing(false);
+  };
+
+  if (editing) return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        type="number" min="1" max="9999"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false); }}
+        className="w-16 px-1.5 py-0.5 border-2 border-blue-500 rounded-lg text-xs text-center focus:outline-none font-bold bg-white"
+        autoFocus
+      />
+      <button onClick={handleSave} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-xs font-bold">✓</button>
+      <button onClick={() => setEditing(false)} className="px-1.5 py-0.5 bg-gray-400 text-white rounded text-xs">✕</button>
+    </span>
+  );
+
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      title="Kattints a rajtszám szerkesztéséhez"
+      className="cursor-pointer"
+    >
+      {competitor.start_number
+        ? <span className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black px-2 py-0.5 rounded-lg min-w-[2rem] text-center inline-block transition-colors">#{competitor.start_number}</span>
+        : <span className="bg-gray-200 hover:bg-blue-100 text-gray-400 hover:text-blue-600 text-xs font-bold px-2 py-0.5 rounded-lg inline-block border border-dashed border-gray-300 hover:border-blue-400 transition-colors">#–</span>
+      }
+    </span>
+  );
+};
+
 // ═════════════════════════════════════════════════════════════════════════════
 export default function FishingCompetition() {
 
@@ -541,7 +580,13 @@ export default function FishingCompetition() {
     } catch (e) { alert('Hiba: ' + e.message); }
   };
 
-  const executeDeleteCompetitor = async () => {
+  const saveStartNumber = async (competitorId, num) => {
+    const n = num ? (parseInt(num) || null) : null;
+    try {
+      await supabase.from('competitors').update({ start_number: n }).eq('id', competitorId);
+      setCompetitors(prev => prev.map(c => c.id === competitorId ? { ...c, start_number: n } : c));
+    } catch (e) { alert('Hiba: ' + e.message); }
+  };
     if (!deleteConfirm) return;
     try {
       await supabase.from('competitors').delete().eq('id', deleteConfirm.id);
@@ -1030,7 +1075,7 @@ export default function FishingCompetition() {
                       <tr key={c.id} className={idx%2===0?'bg-white':'bg-gray-50/50'}>
                         <td className="px-3 py-2.5 font-bold text-gray-800 sticky left-0 bg-inherit whitespace-nowrap">
                           <span className="inline-flex items-center gap-2">
-                            {c.start_number && <span className="bg-blue-600 text-white text-xs font-black px-2 py-0.5 rounded-lg min-w-[2rem] text-center">#{c.start_number}</span>}
+                            <StartNumberCell competitor={c} onSave={(id, num) => saveStartNumber(id, num)} />
                             {c.name}
                           </span>
                         </td>
