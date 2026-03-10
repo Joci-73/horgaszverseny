@@ -202,7 +202,7 @@ export default function FishingCompetition() {
       const built = await buildCompetitors(comp.id, mf);
       setCompetitors(built);
       setCatchDay(calcCurrentDay(sd, st, days));
-      const { data: regs } = await supabase.from('registrations').select('*').eq('competition_id', comp.id).order('start_number', { ascending: true });
+      const { data: regs } = await supabase.from('registrations').select('*').eq('competition_id', comp.id).order('created_at', { ascending: true });
       setRegistrations(regs || []);
       setShowCompetitionList(false);
       if (allComps) setCompetitions(allComps);
@@ -641,7 +641,7 @@ export default function FishingCompetition() {
             <Fish className="w-9 h-9" />
             <div>
               <h1 className="text-2xl font-bold leading-tight">{title}</h1>
-              {location && <p className="text-sm text-blue-100 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" />{location}</p>}
+              {location && !user && <p className="text-sm text-blue-100 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" />{location}</p>}
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -660,60 +660,119 @@ export default function FishingCompetition() {
 
       <div className="max-w-7xl mx-auto p-4 space-y-6">
 
-        {/* ── VERSENY KIÍRÁS ── */}
-        {(imageUrl || description || location || contact || startDate) && (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            {imageUrl && <img src={imageUrl} alt="Verseny" className="w-full max-h-72 object-cover" />}
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-bold text-gray-800">📋 Verseny Kiírás</h2>
-                <button onClick={() => setShowAnnouncement(!showAnnouncement)} className="text-gray-500 hover:text-gray-700 p-1">
-                  {showAnnouncement ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </button>
+        {/* ── VERSENY KIÍRÁS + JELENTKEZÉS — csak látogatóknak, admin nem látja ── */}
+        {!user && <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          {/* Fejléc — mindig látható, kattintható */}
+          <button
+            onClick={() => setShowAnnouncement(!showAnnouncement)}
+            className="w-full flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-600 to-green-500 text-white hover:from-blue-700 hover:to-green-600 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <Fish className="w-6 h-6" />
+              <div className="text-left">
+                <p className="text-lg font-bold leading-tight">{title || 'Verseny Kiírás'}</p>
+                {location && <p className="text-xs text-blue-100 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" />{location}</p>}
               </div>
-              {showAnnouncement && (
-                <div className="space-y-3">
-                  {startDate && (
-                    <div className="flex items-start gap-2 text-gray-700">
-                      <Calendar className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <span><strong>{compDays} napos verseny</strong> • {startDate.replace(/-/g,'.')} • Napi időszak: {dailyStartTime} – {dailyEndTime}</span>
-                    </div>
-                  )}
-                  {location && <div className="flex items-center gap-2 text-gray-700"><MapPin className="w-4 h-4 text-green-500 flex-shrink-0" /><span>{location}</span></div>}
-                  {description && <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{description}</p>}
-                  {contact && <div className="flex items-center gap-2 text-gray-700"><Phone className="w-4 h-4 text-purple-500 flex-shrink-0" /><span>{contact}</span></div>}
-                  <div className="inline-flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                    <Fish className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-semibold text-blue-700">{maxFish} halat fogott verseny • {compDays} nap</span>
-                  </div>
-                </div>
-              )}
             </div>
-          </div>
-        )}
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:inline text-sm font-semibold bg-white/20 px-3 py-1 rounded-full">
+                {showAnnouncement ? 'Bezárás' : 'Kiírás & Jelentkezés'}
+              </span>
+              {showAnnouncement ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </div>
+          </button>
 
-        {/* ── VERSENYZŐ JELENTKEZÉS ── */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2"><Users className="w-5 h-5 text-blue-600" />Versenyző Jelentkezés</h2>
-          {regSuccess ? (
-            <div className="flex items-center gap-3 bg-green-100 border-2 border-green-400 rounded-xl p-4">
-              <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-              <p className="text-green-700 font-semibold">Sikeres jelentkezés! A szervező emailben értesítést kap, és hamarosan felveszi Önnel a kapcsolatot.</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input type="text" value={regName} onChange={(e) => setRegName(e.target.value)} placeholder="Teljes neve..." className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" />
-                <input type="tel" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} onKeyPress={(e) => e.key==='Enter' && handleRegistration()} placeholder="Telefonszám..." className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" />
-                <button onClick={handleRegistration} disabled={regLoading} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-semibold flex items-center justify-center gap-2 min-w-max">
-                  {regLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Jelentkezés
-                </button>
+          {/* Kinyitható tartalom */}
+          {showAnnouncement && (
+            <div>
+              {/* Borítókép */}
+              {imageUrl && <img src={imageUrl} alt="Verseny" className="w-full max-h-80 object-cover" />}
+
+              {/* Kiírás adatok */}
+              <div className="p-6 space-y-4 border-b-2 border-gray-100">
+                {startDate && (
+                  <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl">
+                    <Calendar className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-bold text-blue-800">{compDays} napos verseny</p>
+                      <p className="text-sm text-blue-600">{startDate.replace(/-/g,'.')} • Napi horgászat: {dailyStartTime} – {dailyEndTime}</p>
+                    </div>
+                  </div>
+                )}
+                {location && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
+                    <MapPin className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span className="font-semibold text-green-800">{location}</span>
+                  </div>
+                )}
+                {description && (
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-sm">{description}</p>
+                  </div>
+                )}
+                {contact && (
+                  <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl">
+                    <Phone className="w-5 h-5 text-purple-500 flex-shrink-0" />
+                    <span className="font-semibold text-purple-800">{contact}</span>
+                  </div>
+                )}
+                <div className="inline-flex items-center gap-2 bg-blue-100 rounded-xl px-4 py-2.5">
+                  <Fish className="w-5 h-5 text-blue-600" />
+                  <span className="font-bold text-blue-700">{maxFish} halat fogott verseny • {compDays} nap</span>
+                </div>
               </div>
-              {regError && <p className="mt-2 text-red-600 text-sm font-semibold">{regError}</p>}
-              <p className="mt-2 text-xs text-gray-400">* Telefonszámát nem tároljuk — csak a szervezőnek továbbítjuk emailben. A honlapon kizárólag a neve jelenik meg.</p>
-            </>
+
+              {/* Jelentkezési szekció */}
+              <div className="p-6 bg-gradient-to-b from-gray-50 to-white">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />Jelentkezés a versenyre
+                </h3>
+                {regSuccess ? (
+                  <div className="flex items-start gap-3 bg-green-100 border-2 border-green-400 rounded-xl p-4">
+                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-green-800 font-bold">Sikeres jelentkezés!</p>
+                      <p className="text-green-700 text-sm mt-1">A szervező emailben értesítést kapott. Rajtszámát a verseny helyszínén húzza.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder="Teljes neve..."
+                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-sm"
+                      />
+                      <input
+                        type="tel"
+                        value={regPhone}
+                        onChange={(e) => setRegPhone(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleRegistration()}
+                        placeholder="Telefonszám..."
+                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-sm"
+                      />
+                      <button
+                        onClick={handleRegistration}
+                        disabled={regLoading}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-400 font-bold flex items-center justify-center gap-2 min-w-max shadow-md"
+                      >
+                        {regLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        Jelentkezem
+                      </button>
+                    </div>
+                    {regError && <p className="mt-2 text-red-600 text-sm font-semibold">{regError}</p>}
+                    <p className="mt-3 text-xs text-gray-400">
+                      ℹ Telefonszámát nem tároljuk — csak a szervezőnek továbbítjuk értesítésként.
+                      A honlapon kizárólag a neve jelenik meg. A rajtszámot a verseny helyszínén húzza.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
           )}
-        </div>
+        </div>}
 
         {/* ── BEJELENTKEZŐ MODAL ── */}
         {showLoginModal && (
@@ -887,7 +946,6 @@ export default function FishingCompetition() {
                     .filter(r => !competitors.some(c => c.name === r.name))
                     .map((r, idx) => (
                       <button key={idx} onClick={() => addCompetitor(r.name)} className="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-blue-300 rounded-lg text-sm font-semibold hover:bg-blue-50 hover:border-blue-500 transition-colors">
-                        <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold">#{r.start_number}</span>
                         {r.name}
                         <Plus className="w-3 h-3 text-blue-600" />
                       </button>
