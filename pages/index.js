@@ -544,7 +544,15 @@ export default function FishingCompetition() {
     finally { setImageUploading(false); }
   };
 
-  const archiveCompetition = async () => {
+  const handleImageDelete = async () => {
+    if (!window.confirm('Biztosan törlöd a borítóképet?')) return;
+    try {
+      const { error } = await supabase.from('competitions').update({ image_url: '' }).eq('id', competitionId);
+      if (error) throw error;
+      setImageUrl('');
+      setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, image_url: '' } : c));
+    } catch (e) { alert('Törlési hiba: ' + e.message); }
+  };
     if (!competitionId || !window.confirm('Biztosan lezárod és archiválod?')) return;
     try { await supabase.from('competitions').update({ archived: true }).eq('id', competitionId); await loadCompetitions(); }
     catch (e) { alert('Hiba: ' + e.message); }
@@ -671,12 +679,12 @@ export default function FishingCompetition() {
       b.fishCount !== a.fishCount ? b.fishCount - a.fishCount : b.totalWeight - a.totalWeight);
     const allCatches = [];
     competitors.forEach(c => c.catches.forEach(x => allCatches.push({ name: c.name, weight: x.weight, day: x.day || 1 })));
-    const todayBiggest = allCatches.filter(x => x.day === currentDay).sort((a, b) => b.weight - a.weight);
+    const allBiggest = allCatches.sort((a, b) => b.weight - a.weight);
     const dailyBiggest = {};
     for (let d = 1; d <= compDays; d++) {
       dailyBiggest[d] = allCatches.filter(x => x.day === d).sort((a, b) => b.weight - a.weight).slice(0, 3);
     }
-    return { mainRanking, todayBiggest, dailyBiggest, currentDay };
+    return { mainRanking, allBiggest, dailyBiggest, currentDay };
   }, [competitors, compDays, startDate, dailyStartTime]);
 
   const archivedResults = useMemo(() => {
@@ -914,13 +922,13 @@ export default function FishingCompetition() {
             <div>
               <h1 className="text-2xl font-bold">Horgászverseny</h1>
               <p className="text-green-200 text-xs mt-0.5">Eredmények és versenykiírások</p>
+              <a href="https://egynaposverseny.vercel.app/" target="_blank" rel="noopener noreferrer"
+                className="text-green-100 hover:text-white text-xs mt-1 inline-flex items-center gap-1 underline underline-offset-2 opacity-80 hover:opacity-100">
+                <Fish className="w-3 h-3" />Átlépés az egynapos verseny honlapra
+              </a>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href="https://egynaposverseny.vercel.app/" target="_blank" rel="noopener noreferrer"
-              className="px-3 py-1.5 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 text-xs font-bold whitespace-nowrap flex items-center gap-1.5" title="Egynapos horgászverseny oldal">
-              <Fish className="w-3.5 h-3.5" />Egynapos verseny
-            </a>
             <button onClick={() => setShowCompetitionList(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30" title="Versenyek"><FolderOpen className="w-4 h-4" /></button>
             <button onClick={handleShare} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30" title="Megosztás"><Share2 className="w-4 h-4" /></button>
             {user
@@ -935,7 +943,7 @@ export default function FishingCompetition() {
         {/* VERSENY KÁRTYA — csak látogatóknak */}
         {!user && activeCompData && (
           <EventCard
-            comp={activeCompData}
+            comp={{ ...activeCompData, image_url: imageUrl }}
             registrations={registrations}
             onRegister={() => setShowRegModal(true)}
           />
@@ -968,12 +976,22 @@ export default function FishingCompetition() {
                   </div>
                   <div className="mt-3">
                     <label className="block text-xs font-bold text-gray-600 mb-1">Borítókép</label>
+                    {imageUrl && (
+                      <div className="mb-2 relative inline-block">
+                        <img src={imageUrl} alt="Borítókép" className="h-24 rounded-xl object-cover border-2 border-gray-200" />
+                        <button
+                          onClick={handleImageDelete}
+                          className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md"
+                          title="Kép törlése">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3 flex-wrap">
                       <label className={`px-4 py-2 rounded-xl cursor-pointer text-sm flex items-center gap-2 font-semibold ${imageUploading ? 'bg-gray-400 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                        <Upload className="w-4 h-4" />{imageUploading ? 'Feltöltés...' : 'Kép feltöltése'}
+                        <Upload className="w-4 h-4" />{imageUploading ? 'Feltöltés...' : imageUrl ? 'Kép cseréje' : 'Kép feltöltése'}
                         <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={imageUploading} />
                       </label>
-                      {imageUrl && <span className="text-xs text-green-600 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" />Feltöltve</span>}
                     </div>
                   </div>
                 </div>
@@ -1169,18 +1187,17 @@ export default function FishingCompetition() {
               <div className="bg-white rounded-2xl shadow-lg p-5">
                 {user && !tableVisibility.todayBiggest && adminHiddenNote}
                 <h3 className="text-base font-bold mb-3 text-red-700 flex items-center gap-2">
-                  <Fish className="w-5 h-5 text-red-400" />Mai Legnagyobb Hal
-                  <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{results.currentDay}. nap</span>
+                  <Fish className="w-5 h-5 text-red-400" />Legnagyobb Hal
                 </h3>
-                {results.todayBiggest.length > 0
-                  ? <div className="space-y-2">{results.todayBiggest.slice(0,5).map((e,i) => (
+                {results.allBiggest.length > 0
+                  ? <div className="space-y-2">{results.allBiggest.slice(0,5).map((e,i) => (
                       <div key={i} className={placeStyle(i)}>
                         <div className="flex items-center gap-2 text-sm"><span className="text-xl">{placeEmoji(i)}</span><span className="font-semibold">{e.name}</span></div>
                         <span className="font-bold text-red-700 text-sm whitespace-nowrap">{e.weight} g</span>
                       </div>))}</div>
-                  : <p className="text-gray-400 text-center py-6 text-sm">Még nincs mai fogás</p>}
+                  : <p className="text-gray-400 text-center py-6 text-sm">Még nincs fogás</p>}
               </div>
-            ) : hiddenBanner('Mai Legnagyobb Hal')}
+            ) : hiddenBanner('Legnagyobb Hal')}
 
             {(user || tableVisibility.dailyBiggest) ? (
               <div className="bg-white rounded-2xl shadow-lg p-5">
