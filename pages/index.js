@@ -534,6 +534,7 @@ export default function FishingCompetition() {
       const { data: urlData } = supabase.storage.from('competition-images').getPublicUrl(name);
       setImageUrl(urlData.publicUrl);
       await saveCompSettings({ image_url: urlData.publicUrl });
+      setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, image_url: urlData.publicUrl } : c));
     } catch (e) { alert('Képfeltöltési hiba: ' + e.message); }
     finally { setImageUploading(false); }
   };
