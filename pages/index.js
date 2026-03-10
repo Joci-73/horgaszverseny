@@ -386,13 +386,10 @@ export default function FishingCompetition() {
     try {
       const { data: existing } = await supabase.from('registrations').select('id').eq('competition_id', competitionId).eq('name', regName.trim());
       if (existing && existing.length > 0) { setRegError('Ez a név már regisztrálva van!'); return; }
-      const { data: allRegs } = await supabase.from('registrations').select('start_number').eq('competition_id', competitionId);
-      const used = (allRegs || []).map(r => r.start_number).filter(Boolean);
-      let startNum;
-      do { startNum = Math.floor(Math.random() * 900) + 1; } while (used.includes(startNum));
-      const { error } = await supabase.from('registrations').insert([{ competition_id: competitionId, name: regName.trim(), start_number: startNum }]);
+      // Csak névvel mentünk — telefonszámot NEM tároljuk
+      const { error } = await supabase.from('registrations').insert([{ competition_id: competitionId, name: regName.trim() }]);
       if (error) throw error;
-      // Send email via EmailJS REST API (phone only in email, not stored in DB)
+      // Email küldés EmailJS REST API-n (telefonszám csak emailben, DB-ben nincs)
       try {
         await fetch('https://api.emailjs.com/api/v1.0/email/send', {
           method: 'POST',
@@ -406,12 +403,11 @@ export default function FishingCompetition() {
               verseny_nev: title,
               versenyzo_nev: regName.trim(),
               telefonszam: regPhone.trim(),
-              rajtszam: startNum,
             }
           })
         });
       } catch (mailErr) { console.warn('Email küldési hiba:', mailErr); }
-      setRegistrations(prev => [...prev, { name: regName.trim(), start_number: startNum, competition_id: competitionId }]);
+      setRegistrations(prev => [...prev, { name: regName.trim(), competition_id: competitionId }]);
       setRegName(''); setRegPhone('');
       setRegSuccess(true);
       setTimeout(() => setRegSuccess(false), 6000);
