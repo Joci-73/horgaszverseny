@@ -529,12 +529,17 @@ export default function FishingCompetition() {
     try {
       const ext  = file.name.split('.').pop();
       const name = `competition-${competitionId}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('competition-images').upload(name, file, { upsert: true });
-      if (error) throw error;
+      const { error: uploadError } = await supabase.storage.from('competition-images').upload(name, file, { upsert: true });
+      if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('competition-images').getPublicUrl(name);
-      setImageUrl(urlData.publicUrl);
-      await saveCompSettings({ image_url: urlData.publicUrl });
-      setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, image_url: urlData.publicUrl } : c));
+      const publicUrl = urlData.publicUrl;
+      // DB mentés
+      const { error: dbError } = await supabase.from('competitions').update({ image_url: publicUrl }).eq('id', competitionId);
+      if (dbError) throw dbError;
+      // State frissítés
+      setImageUrl(publicUrl);
+      setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, image_url: publicUrl } : c));
+      alert('Kép sikeresen feltöltve!');
     } catch (e) { alert('Képfeltöltési hiba: ' + e.message); }
     finally { setImageUploading(false); }
   };
