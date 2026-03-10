@@ -128,8 +128,8 @@ const RegistrationModal = ({ competitionTitle, onClose, onSubmit }) => {
 };
 
 // ── VERSENY KÁRTYA ────────────────────────────────────────────────────────────
-const EventCard = ({ comp, registrations, onRegister }) => {
-  const [expanded, setExpanded] = useState(true);
+const EventCard = ({ comp, registrations, onRegister, onEnter }) => {
+  const [expanded, setExpanded] = useState(false);
 
   const desc      = safeField(comp?.description);
   const loc       = safeField(comp?.location);
@@ -264,6 +264,13 @@ const EventCard = ({ comp, registrations, onRegister }) => {
                 <Plus className="w-4 h-4" />Jelentkezés a versenyre
               </button>
             </div>
+            {/* Belépés a versenybe */}
+            <div className="border-t border-gray-100 pt-3">
+              <button onClick={onEnter}
+                className="w-full py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm">
+                <Trophy className="w-4 h-4" />Verseny eredmények megtekintése →
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -387,6 +394,7 @@ export default function FishingCompetition() {
   const [imageUploading, setImageUploading] = useState(false);
   const [pageViews,      setPageViews]      = useState({ today: 0, week: 0, total: 0, mobil: 0, pc: 0 });
   const [dbError,        setDbError]        = useState(null);
+  const [selectedCompId, setSelectedCompId] = useState(null);
 
   useEffect(() => {
     trackVisit(); checkUser();
@@ -971,13 +979,35 @@ export default function FishingCompetition() {
 
       <div className="max-w-5xl mx-auto px-4 py-5 space-y-5">
 
-        {/* VERSENY KÁRTYA — csak látogatóknak */}
-        {!user && activeCompData && (
-          <EventCard
-            comp={{ ...activeCompData, image_url: imageUrl }}
-            registrations={registrations}
-            onRegister={() => setShowRegModal(true)}
-          />
+        {/* VERSENY KÁRTYÁK — csak látogatóknak, főoldal */}
+        {!user && !selectedCompId && (
+          <div className="space-y-3">
+            {competitions.filter(c => !c.archived).length === 0 && (
+              <div className="bg-white rounded-2xl shadow p-8 text-center text-gray-400">
+                <Fish className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Jelenleg nincs aktív verseny.</p>
+              </div>
+            )}
+            {competitions.filter(c => !c.archived).map(comp => (
+              <EventCard
+                key={comp.id}
+                comp={comp.id === competitionId ? { ...comp, image_url: imageUrl } : comp}
+                registrations={comp.id === competitionId ? registrations : (comp.registrations || [])}
+                onRegister={() => { if (comp.id !== competitionId) loadCompetition(comp.id); setShowRegModal(true); }}
+                onEnter={() => { if (comp.id !== competitionId) loadCompetition(comp.id); setSelectedCompId(comp.id); }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* EREDMÉNY NÉZET — látogató belépett egy versenybe */}
+        {!user && selectedCompId && (
+          <div className="space-y-5">
+            <button onClick={() => setSelectedCompId(null)}
+              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow text-sm font-semibold text-gray-600 hover:bg-gray-50">
+              ← Vissza a főoldalra
+            </button>
+          </div>
         )}
 
         {/* ADMIN: Beállítások */}
@@ -1217,7 +1247,8 @@ export default function FishingCompetition() {
           </div>
         )}
 
-        {/* EREDMÉNY TÁBLÁK */}
+        {/* EREDMÉNY TÁBLÁK — látogatónak csak ha belépett, adminnak mindig */}
+        {(user || selectedCompId) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2">
             {(user || tableVisibility.mainRanking) ? (
@@ -1288,6 +1319,15 @@ export default function FishingCompetition() {
             ) : hiddenBanner('Napi Legnagyobb Halak')}
           </div>
         </div>
+        )}
+
+        {/* Vissza gomb a látogató eredménynézet aljára */}
+        {!user && selectedCompId && (
+          <button onClick={() => setSelectedCompId(null)}
+            className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow text-sm font-semibold text-gray-600 hover:bg-gray-50">
+            ← Vissza a főoldalra
+          </button>
+        )}
 
         {/* ADMIN: Látogatók */}
         {user && (
