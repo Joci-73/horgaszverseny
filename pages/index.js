@@ -594,9 +594,7 @@ export default function FishingCompetition() {
 
   const submitRegistration = async (name, phone) => {
     if (!competitionId) throw new Error('Nincs aktív verseny');
-    const { data: existing } = await supabase.from('registrations').select('id').eq('competition_id', competitionId).eq('name', name);
-    if (existing && existing.length > 0) throw new Error('Ez a név már regisztrálva van!');
-    // Csak nevet mentünk — telefonszámot NEM tároljuk
+    // Csak nevet mentünk — telefonszámot NEM tároljuk (azonos nevűek is jelentkezhetnek)
     const { data, error } = await supabase.from('registrations').insert([{ competition_id: competitionId, name }]).select();
     if (error) throw error;
     await sendRegEmail(title, name, phone);
@@ -866,6 +864,10 @@ export default function FishingCompetition() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <a href="https://egynaposverseny.vercel.app/" target="_blank" rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 text-xs font-bold whitespace-nowrap flex items-center gap-1.5" title="Egynapos horgászverseny oldal">
+              <Fish className="w-3.5 h-3.5" />Egynapos verseny
+            </a>
             <button onClick={() => setShowCompetitionList(true)} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30" title="Versenyek"><FolderOpen className="w-4 h-4" /></button>
             <button onClick={handleShare} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30" title="Megosztás"><Share2 className="w-4 h-4" /></button>
             {user
@@ -1026,7 +1028,12 @@ export default function FishingCompetition() {
                     const total = c.catches.reduce((s,x)=>s+x.weight,0);
                     return (
                       <tr key={c.id} className={idx%2===0?'bg-white':'bg-gray-50/50'}>
-                        <td className="px-3 py-2.5 font-bold text-gray-800 sticky left-0 bg-inherit whitespace-nowrap">{c.name}</td>
+                        <td className="px-3 py-2.5 font-bold text-gray-800 sticky left-0 bg-inherit whitespace-nowrap">
+                          <span className="inline-flex items-center gap-2">
+                            {c.start_number && <span className="bg-blue-600 text-white text-xs font-black px-2 py-0.5 rounded-lg min-w-[2rem] text-center">#{c.start_number}</span>}
+                            {c.name}
+                          </span>
+                        </td>
                         <td className="px-2 py-2.5 text-center"><span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-xs">{c.catches.length}</span></td>
                         {Array.from({ length: maxFish }, (_, i) => (
                           <td key={i} className="px-1.5 py-2 text-center">
