@@ -136,10 +136,14 @@ const EventCard = ({ comp, registrations, onRegister }) => {
   const contact   = safeField(comp?.contact);
   const imgUrl    = safeField(comp?.image_url);
   const startDate = safeField(comp?.start_date);
-  const startTime = safeField(comp?.start_time) || '00:01';
-  const endTime   = safeField(comp?.end_time)   || '23:59';
   const days      = comp?.days     || 1;
   const maxFish   = comp?.max_fish || DEFAULT_MAX_FISH;
+  // day_times: per-day array, fall back to legacy
+  const legacyStart = safeField(comp?.start_time) || '00:01';
+  const legacyEnd   = safeField(comp?.end_time)   || '23:59';
+  const compDayTimes = (comp?.day_times && comp.day_times.length > 0)
+    ? comp.day_times
+    : Array.from({ length: days }, () => ({ start: legacyStart, end: legacyEnd }));
 
   const formatDate = (s) => {
     if (!s) return '';
@@ -193,9 +197,21 @@ const EventCard = ({ comp, registrations, onRegister }) => {
                 {startDate && (
                   <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl p-3">
                     <Calendar className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-bold text-blue-800">{days} napos verseny · {formatDate(startDate)}</p>
-                      <p className="text-xs text-blue-600 mt-0.5">Napi horgászat: {startTime} – {endTime}</p>
+                      {compDayTimes.map((dt, i) => {
+                        const base = new Date(startDate);
+                        base.setDate(base.getDate() + i);
+                        const allSame = compDayTimes.every(t => t.start === dt.start && t.end === dt.end);
+                        if (allSame && i > 0) return null;
+                        return (
+                          <p key={i} className="text-xs text-blue-600 mt-0.5">
+                            {allSame
+                              ? `Napi horgászat: ${dt.start} – ${dt.end}`
+                              : `${i+1}. nap: ${dt.start} – ${dt.end}`}
+                          </p>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -341,8 +357,7 @@ export default function FishingCompetition() {
   const [maxFish,         setMaxFish]         = useState(DEFAULT_MAX_FISH);
   const [compDays,        setCompDays]        = useState(1);
   const [startDate,       setStartDate]       = useState('');
-  const [dailyStartTime,  setDailyStartTime]  = useState('00:01');
-  const [dailyEndTime,    setDailyEndTime]    = useState('23:59');
+  const [dayTimes,        setDayTimes]        = useState([{ start: '00:01', end: '23:59' }]);
   const [location,        setLocation]        = useState('');
   const [description,     setDescription]     = useState('');
   const [contact,         setContact]         = useState('');
@@ -355,8 +370,7 @@ export default function FishingCompetition() {
   const [sDescription,    setSDescription]    = useState('');
   const [sContact,        setSContact]        = useState('');
   const [sStartDate,      setSStartDate]      = useState('');
-  const [sDailyStartTime, setSDailyStartTime] = useState('00:01');
-  const [sDailyEndTime,   setSDailyEndTime]   = useState('23:59');
+  const [sDayTimes,       setSDayTimes]       = useState([{ start: '00:01', end: '23:59' }]);
   const [sDays,           setSDays]           = useState(1);
 
   const [competitors,   setCompetitors]   = useState([]);
@@ -383,11 +397,19 @@ export default function FishingCompetition() {
     return () => auth?.subscription?.unsubscribe();
   }, []);
 
-  const calcCurrentDay = (sd, st, days) => {
+  const calcCurrentDay = (sd, dTimes, days) => {
     if (!sd) return 1;
-    const start = new Date(`${sd}T${st || '00:01'}:00`);
-    const diff  = Math.floor((Date.now() - start) / 86400000) + 1;
-    return Math.max(1, Math.min(days || 1, diff));
+    const now = Date.now();
+    let current = 1;
+    for (let d = 1; d <= (days || 1); d++) {
+      const dt = (dTimes && dTimes[d-1]) || { start: '00:01', end: '23:59' };
+      const base = new Date(sd);
+      base.setDate(base.getDate() + (d - 1));
+      const dateStr = base.toISOString().split('T')[0];
+      const dayStart = new Date(`${dateStr}T${dt.start}:00`).getTime();
+      if (now >= dayStart) current = d;
+    }
+    return current;
   };
 
   const trackVisit = async () => {
@@ -465,18 +487,25 @@ export default function FishingCompetition() {
       const mf = comp.max_fish || DEFAULT_MAX_FISH;
       const days = comp.days || 1;
       const sd = comp.start_date || '';
-      const st = comp.start_time || '00:01';
-      const et = comp.end_time   || '23:59';
+      // day_times: per-day array, fall back to legacy start_time/end_time
+      const legacyStart = comp.start_time || '00:01';
+      const legacyEnd   = comp.end_time   || '23:59';
+      const loadedTimes = (comp.day_times && comp.day_times.length > 0)
+        ? comp.day_times
+        : Array.from({ length: days }, () => ({ start: legacyStart, end: legacyEnd }));
+      // Ensure array length matches days
+      const normalizedTimes = Array.from({ length: days }, (_, i) =>
+        loadedTimes[i] || { start: '00:01', end: '23:59' });
       setCompetitionId(comp.id); setTitle(comp.title); setMaxFish(mf); setCompDays(days);
-      setStartDate(sd); setDailyStartTime(st); setDailyEndTime(et);
+      setStartDate(sd); setDayTimes(normalizedTimes);
       setLocation(comp.location || ''); setDescription(comp.description || '');
       setContact(comp.contact || ''); setImageUrl(comp.image_url || '');
       setTableVisibility(comp.table_visibility || { mainRanking: true, todayBiggest: true, dailyBiggest: true });
       setSTitle(comp.title); setSLocation(comp.location||''); setSDescription(comp.description||'');
-      setSContact(comp.contact||''); setSStartDate(sd); setSDailyStartTime(st); setSDailyEndTime(et); setSDays(days);
+      setSContact(comp.contact||''); setSStartDate(sd); setSDayTimes(normalizedTimes); setSDays(days);
       const built = await buildCompetitors(comp.id, mf);
       setCompetitors(built);
-      setCatchDay(calcCurrentDay(sd, st, days));
+      setCatchDay(calcCurrentDay(sd, normalizedTimes, days));
       const { data: regs } = await supabase.from('registrations').select('*').eq('competition_id', comp.id).order('created_at', { ascending: true });
       setRegistrations(regs || []);
       setShowCompetitionList(false);
@@ -506,12 +535,12 @@ export default function FishingCompetition() {
 
   const saveAnnouncementSettings = async () => {
     const u = { title: sTitle, location: sLocation, description: sDescription, contact: sContact,
-      start_date: sStartDate, start_time: sDailyStartTime, end_time: sDailyEndTime, days: sDays };
+      start_date: sStartDate, days: sDays, day_times: sDayTimes };
     await saveCompSettings(u);
     setTitle(sTitle); setLocation(sLocation); setDescription(sDescription); setContact(sContact);
-    setStartDate(sStartDate); setDailyStartTime(sDailyStartTime); setDailyEndTime(sDailyEndTime); setCompDays(sDays);
+    setStartDate(sStartDate); setCompDays(sDays); setDayTimes(sDayTimes);
     setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, ...u } : c));
-    setCatchDay(calcCurrentDay(sStartDate, sDailyStartTime, sDays));
+    setCatchDay(calcCurrentDay(sStartDate, sDayTimes, sDays));
     alert('Beállítások mentve!');
   };
 
@@ -673,7 +702,7 @@ export default function FishingCompetition() {
   };
 
   const results = useMemo(() => {
-    const currentDay = calcCurrentDay(startDate, dailyStartTime, compDays);
+    const currentDay = calcCurrentDay(startDate, dayTimes, compDays);
     const withScores = competitors.map(c => ({
       ...c, totalWeight: c.catches.reduce((s, x) => s + x.weight, 0), fishCount: c.catches.length,
     }));
@@ -681,13 +710,13 @@ export default function FishingCompetition() {
       b.fishCount !== a.fishCount ? b.fishCount - a.fishCount : b.totalWeight - a.totalWeight);
     const allCatches = [];
     competitors.forEach(c => c.catches.forEach(x => allCatches.push({ name: c.name, weight: x.weight, day: x.day || 1 })));
-    const allBiggest = allCatches.sort((a, b) => b.weight - a.weight);
+    const allBiggest = [...allCatches].sort((a, b) => b.weight - a.weight);
     const dailyBiggest = {};
     for (let d = 1; d <= compDays; d++) {
       dailyBiggest[d] = allCatches.filter(x => x.day === d).sort((a, b) => b.weight - a.weight).slice(0, 3);
     }
     return { mainRanking, allBiggest, dailyBiggest, currentDay };
-  }, [competitors, compDays, startDate, dailyStartTime]);
+  }, [competitors, compDays, startDate, dayTimes]);
 
   const archivedResults = useMemo(() => {
     if (!archivedComp) return { mainRanking: [], dailyBiggest: {} };
@@ -1000,10 +1029,45 @@ export default function FishingCompetition() {
 
                 <div className="p-4 bg-green-50 rounded-2xl border border-green-200">
                   <h3 className="font-bold text-green-800 mb-3 text-xs uppercase tracking-wide">🎣 Verseny Paraméterek</h3>
-                  <div className="flex flex-wrap gap-6">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-600 mb-2">Hány napos? (1–5)</label>
-                      <div className="flex gap-2">{[1,2,3,4,5].map(d => <button key={d} onClick={() => setSDays(d)} className={`w-11 h-11 rounded-full font-bold ${sDays===d?'bg-green-600 text-white shadow':'bg-white text-gray-700 border-2 border-gray-300 hover:border-green-400'}`}>{d}</button>)}</div>
+                      <div className="flex gap-2">
+                        {[1,2,3,4,5].map(d => (
+                          <button key={d} onClick={() => {
+                            setSDays(d);
+                            setSDayTimes(prev => Array.from({ length: d }, (_, i) =>
+                              prev[i] || { start: '00:01', end: '23:59' }));
+                          }} className={`w-11 h-11 rounded-full font-bold ${sDays===d?'bg-green-600 text-white shadow':'bg-white text-gray-700 border-2 border-gray-300 hover:border-green-400'}`}>{d}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Per-nap időpontok */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-600">Napi horgászati időkeretek</label>
+                      {Array.from({ length: sDays }, (_, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-white border border-green-200 rounded-xl px-3 py-2">
+                          <span className="text-xs font-bold text-green-700 w-14 flex-shrink-0">{i+1}. nap</span>
+                          <div className="flex items-center gap-2 flex-1">
+                            <label className="text-xs text-gray-500">Kezdés:</label>
+                            <input type="time" value={sDayTimes[i]?.start || '00:01'}
+                              onChange={(e) => {
+                                const updated = [...sDayTimes];
+                                updated[i] = { ...updated[i], start: e.target.value };
+                                setSDayTimes(updated);
+                              }}
+                              className="px-2 py-1 border rounded-lg text-sm focus:outline-none focus:border-green-400" />
+                            <label className="text-xs text-gray-500">Zárás:</label>
+                            <input type="time" value={sDayTimes[i]?.end || '23:59'}
+                              onChange={(e) => {
+                                const updated = [...sDayTimes];
+                                updated[i] = { ...updated[i], end: e.target.value };
+                                setSDayTimes(updated);
+                              }}
+                              className="px-2 py-1 border rounded-lg text-sm focus:outline-none focus:border-green-400" />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-600 mb-2">Hány halat fogott verseny?</label>
